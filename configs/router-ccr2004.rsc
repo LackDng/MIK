@@ -34,10 +34,17 @@
 # ============================================================
 
 # ============================================================
-# STEP 1: RESET
-# WARNING: Device will reboot – paste remaining config after reboot
+# STEP 1: RESET (chạy TAY trước khi import file này)
 # ============================================================
-/system reset-configuration no-defaults=yes skip-backup=yes
+# Chạy lệnh sau trong terminal (Winbox hoặc SSH), đợi router reboot:
+#   /system reset-configuration no-defaults=yes skip-backup=yes
+#
+# Sau khi router reboot xong → kết nối lại → chạy:
+#   /import file-name=router-ccr2004.rsc
+#
+# KHÔNG chạy lệnh reset trong file này vì router sẽ reboot giữa chừng
+# và các lệnh phía sau sẽ bị lỗi "interface not found" do default bridge.
+# ============================================================
 
 # ============================================================
 # STEP 2: BRIDGE + VLAN FILTERING

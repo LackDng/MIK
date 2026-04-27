@@ -22,9 +22,10 @@
 # ============================================================
 
 # ============================================================
-# STEP 1: RESET
+# STEP 1: RESET (chạy TAY trước khi import file này)
 # ============================================================
-/system reset-configuration no-defaults=yes skip-backup=yes
+# Terminal: /system reset-configuration no-defaults=yes skip-backup=yes
+# Đợi reboot → kết nối lại → /import file-name=switch-core-crs326.rsc
 
 # ============================================================
 # STEP 2: BRIDGE
