@@ -165,16 +165,11 @@ add address=172.16.40.0/24 gateway=172.16.40.1 \
 /ip pool
 add name=pool-vlan50 ranges=172.16.50.100-172.16.50.200
 /ip dhcp-server option
-add name=opt66-sip code=66 value="'172.16.50.10'" \
-    comment="SIP provisioning server for IP phones"
-/ip dhcp-server option sets
-add name=optset-vlan50 options=opt66-sip comment="DHCP options for VLAN50"
+add name=opt66-sip code=66 value="'172.16.50.10'" comment="SIP provisioning server"
 /ip dhcp-server
-add name=dhcp-vlan50 interface=bridge-lan.50 address-pool=pool-vlan50 \
-    lease-time=1d dhcp-option-set=optset-vlan50 disabled=no
+add name=dhcp-vlan50 interface=bridge-lan.50 address-pool=pool-vlan50 lease-time=1d disabled=no
 /ip dhcp-server network
-add address=172.16.50.0/24 gateway=172.16.50.1 \
-    dns-server=8.8.8.8,1.1.1.1 comment="VLAN50 IP Phone"
+add address=172.16.50.0/24 gateway=172.16.50.1 dns-server=8.8.8.8,1.1.1.1 dhcp-option=opt66-sip comment="VLAN50 IP Phone"
 
 # --- VLAN 60: Office ---
 /ip pool
