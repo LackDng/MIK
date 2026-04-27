@@ -255,10 +255,11 @@ add address=10.10.10.1/24 interface=wg-vpn comment="WireGuard VPN server IP"
 # STEP 10: INTERFACE LISTS
 # ============================================================
 /interface list
-add name=WAN comment="WAN interfaces"
-add name=LAN comment="LAN VLAN interfaces"
+add name=WAN  comment="WAN interfaces"
+add name=LAN  comment="LAN VLAN interfaces"
+add name=MGMT comment="Management only – VLAN10"
 /interface list member
-add interface=pppoe-wan    list=WAN
+add interface=pppoe-wan     list=WAN
 add interface=bridge-lan.10 list=LAN
 add interface=bridge-lan.20 list=LAN
 add interface=bridge-lan.30 list=LAN
@@ -267,6 +268,7 @@ add interface=bridge-lan.50 list=LAN
 add interface=bridge-lan.60 list=LAN
 add interface=bridge-lan.70 list=LAN
 add interface=wg-vpn        list=LAN
+add interface=bridge-lan.10 list=MGMT
 
 # ============================================================
 # STEP 11: ADDRESS LIST – LOCAL_NETS
@@ -582,16 +584,36 @@ add name=guest-limit target=172.16.20.0/22 \
     comment="Guest 50Mbps up+down cap"
 
 # ============================================================
-# STEP 18: SYSTEM
+# STEP 18: SERVICES HARDENING (/ip service)
+# Lớp bảo vệ thứ 1 – cấp dịch vụ, độc lập với firewall
+# ============================================================
+/ip service
+set telnet   disabled=yes
+set ftp      disabled=yes
+set www      disabled=yes
+set www-ssl  disabled=yes
+set api      disabled=yes
+set api-ssl  disabled=yes
+set ssh      port=22   allowed-from=192.168.10.0/24,10.10.10.0/24
+set winbox   port=8291 allowed-from=192.168.10.0/24,10.10.10.0/24
+
+# ============================================================
+# STEP 19: SYSTEM HARDENING
 # ============================================================
 /system identity
 set name=CCR2004-Router
 
+# Tắt bandwidth test server (không dùng, tránh bị lợi dụng)
+/tool bandwidth-server
+set enabled=no
+
+# MAC server chỉ trên VLAN10 – tránh Winbox MAC login từ VLAN khác
 /tool mac-server
-set allowed-interface-list=LAN
+set allowed-interface-list=MGMT
 
 /tool mac-server mac-winbox
-set allowed-interface-list=LAN
+set allowed-interface-list=MGMT
 
+# Neighbor discovery chỉ nội bộ LAN (không quảng bá ra WAN)
 /ip neighbor discovery-settings
 set discover-interface-list=LAN
