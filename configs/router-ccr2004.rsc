@@ -211,14 +211,22 @@ set time-zone-name=Asia/Ho_Chi_Minh
 /interface wireguard
 add name=wg-vpn listen-port=13231 comment="WireGuard VPN – client-to-site"
 
-# IMPORTANT: Replace <VANHAU_PUBLIC_KEY_HERE> with vanhau's actual public key
-#            generated from WireGuard app on client device
-/interface wireguard peers
-add interface=wg-vpn name=vanhau \
-    public-key="<VANHAU_PUBLIC_KEY_HERE>" \
-    allowed-address=10.10.10.2/32 \
-    persistent-keepalive=25 \
-    comment="VPN peer: vanhau – update public-key before enabling"
+# Peer vanhau: chạy tay sau khi có public key từ client
+# -------------------------------------------------------
+# Bước 1 – Lấy server public key (gửi cho vanhau):
+#   /interface wireguard print
+#   → copy giá trị "public-key"
+#
+# Bước 2 – Vanhau tạo keypair trên client (WireGuard app hoặc CLI):
+#   wg genkey | tee privatekey | wg pubkey > publickey
+#   → gửi nội dung file "publickey" cho admin
+#
+# Bước 3 – Admin chạy lệnh sau trên router (thay KEY bằng key thật):
+#   /interface wireguard peers
+#   add interface=wg-vpn name=vanhau \
+#       public-key="<DAN_PUBLIC_KEY_CUA_VANHAU_VAO_DAY>" \
+#       allowed-address=10.10.10.2/32 \
+#       persistent-keepalive=25
 
 /ip address
 add address=10.10.10.1/24 interface=wg-vpn comment="WireGuard VPN server IP"
