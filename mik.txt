@@ -1,0 +1,556 @@
+Bạn là chuyên gia triển khai mạng doanh nghiệp sử dụng MikroTik (RouterOS v7),
+có kinh nghiệm thực tế.
+
+Hãy xuất ra CLI config đầy đủ, chạy được thực tế, có comment rõ ràng.
+
+=======================
+1. THIẾT BỊ & TOPOLOGY
+=======================
+
+Router:
+  - MikroTik CCR2004-16G-2S+ (RouterOS v7)
+
+  Port mapping:
+  ┌──────────────────────────────────────────────────────────┐
+  │ ether1          → WAN (PPPoE, cắm modem ISP)             │
+  │ sfp-sfpplus1    → Core CRS326 (trunk all VLAN)           │
+  │                   [Module S+31DLC10D - 10G Single-mode]  │
+  │ sfp-sfpplus2    → dự phòng (chưa dùng)                   │
+  │ ether2–ether10  → dự phòng (chưa dùng)                   │
+  │ ether11–ether16 → VLAN 70 ACCESS (Camera/NVR trực tiếp)  │
+  └──────────────────────────────────────────────────────────┘
+
+Switch Core:
+  - MikroTik CRS326-24S+2Q+RM (RouterOS v7)
+  - Tất cả port cấu hình GIỐNG NHAU: trunk tagged all VLAN
+  - Gắn port nào cũng được, đề xuất dùng:
+
+  ┌──────────────────────────────────────────────────────────┐
+  │ sfp-sfpplus1    ← Router CCR2004 (trunk all VLAN)        │
+  │                   [Module S+31DLC10D - 10G Single-mode]  │
+  │ sfp1            → CSS610  (trunk all VLAN)               │
+  │                   [Module S-31DLC20D - 1G Single-mode]   │
+  │ sfp2            → CRS328  (trunk all VLAN)               │
+  │                   [Module S-31DLC20D - 1G Single-mode]   │
+  │ sfp3–sfp12      → dự phòng (trunk all VLAN)              │
+  │ sfp-sfpplus2    → dự phòng (trunk all VLAN)              │
+  └──────────────────────────────────────────────────────────┘
+
+Switch Access:
+  - MikroTik CRS328-24P-4S+RM (RouterOS v7)
+  ┌──────────────────────────────────────────────────────────┐
+  │ sfp-sfpplus1    ← Core CRS326 (uplink trunk all VLAN)    │
+  │                   [Module S-31DLC20D - 1G Single-mode]   │
+  │ ether1–ether24  → chưa cấu hình access (để trống)        │
+  └──────────────────────────────────────────────────────────┘
+
+  ⚠️ Module S-31DLC20D là SFP 1G, cắm vào sfp-sfpplus1 (10G port)
+     RouterOS sẽ auto-negotiate xuống 1G — hoạt động bình thường
+
+Switch Access 2:
+  - MikroTik CSS610-8P-2S+IN (SwOS)
+  ┌──────────────────────────────────────────────────────────┐
+  │ Port 9 (SFP)    ← Core CRS326 (uplink trunk all VLAN)    │
+  │                   [Module S-31DLC20D - 1G Single-mode]   │
+  │ Port 1–8 (PoE)  → chưa cấu hình access (để trống)        │
+  └──────────────────────────────────────────────────────────┘
+
+Sơ đồ vật lý:
+
+  Internet (ISP)
+       │
+  [Modem ISP]
+       │ ether1 (PPPoE copper)
+  ┌────┴──────────────────┐
+  │  CCR2004-16G-2S+      │
+  │  (Router – Layer 3)   │
+  └────┬──────────────────┘
+       │ sfp-sfpplus1
+       │ S+31DLC10D (10G SMF)
+       │ sfp-sfpplus1
+  ┌────┴──────────────────┐
+  │  CRS326-24S+2Q+RM     │
+  │  (Core Switch – L2)   │
+  └────┬──────────┬───────┘
+       │ sfp1     │ sfp2
+       │ S-31DLC20D (1G SMF)
+       │          │ S-31DLC20D (1G SMF)
+  ┌────┴──────┐  ┌┴──────────────────┐
+  │  CSS610   │  │  CRS328-24P-4S+   │
+  │ (SwOS-L2) │  │  (RouterOS – L2)  │
+  └───────────┘  └───────────────────┘
+
+  CCR2004 ether11–16 (copper) → Camera/NVR [VLAN 70 access]
+
+Cáp quang yêu cầu:
+  - Tất cả link quang dùng: LC-LC Single-mode OS2 (màu vàng)
+  - KHÔNG dùng multimode (OM3/OM4)
+
+=======================
+2. WAN (PPPoE)
+=======================
+
+Interface vật lý  : ether1
+PPPoE client name : pppoe-wan
+Username          : abcd
+Password          : abcd88qưe
+Tốc độ WAN        : 1 Gbps
+add-default-route : yes
+use-peer-dns      : no
+
+=======================
+3. VLAN & IP PLAN
+=======================
+
+| VLAN | Tên         | Gateway/Prefix     | DHCP Pool                       | DHCP |
+|------|-------------|--------------------|---------------------------------|------|
+|  10  | Management  | 192.168.10.1/24    | Không có (static only)          |  No  |
+|  20  | Wifi Guest  | 172.16.20.1/22     | 172.16.20.100 – 172.16.23.200   |  Yes |
+|  30  | Manage Wifi | 172.16.30.1/24     | 172.16.30.100 – 172.16.30.200   |  Yes |
+|  40  | IPTV Cloud  | 172.16.40.1/24     | 172.16.40.100 – 172.16.40.200   |  Yes |
+|  50  | IP Phone    | 172.16.50.1/24     | 172.16.50.100 – 172.16.50.200   |  Yes |
+|  60  | Office      | 192.168.0.1/24     | 192.168.0.100  – 192.168.0.200  |  Yes |
+|  70  | CCTV        | 192.168.5.1/24     | Không có (static only)          |  No  |
+
+DHCP lease time  : 1d
+DNS push client  : 8.8.8.8, 1.1.1.1
+DHCP option 66   : 172.16.50.10 (chỉ VLAN 50 – SIP provisioning)
+
+IP tĩnh VLAN 70 (cấu hình tay trên thiết bị):
+  NVR-1  : 192.168.5.254  (web port 8054) → được ra internet
+  NVR-2  : 192.168.5.253  (web port 8053) → được ra internet
+  Camera : 192.168.5.1 – 192.168.5.100   → KHÔNG ra internet
+
+=======================
+4. MANAGEMENT IP
+=======================
+
+| Thiết bị      | IP VLAN 10         | Gateway      |
+|---------------|--------------------|--------------|
+| Router        | 192.168.10.1/24    | —            |
+| Core CRS326   | 192.168.10.2/24    | 192.168.10.1 |
+| Access CRS328 | 192.168.10.3/24    | 192.168.10.1 |
+| CSS610        | 192.168.10.4/24    | 192.168.10.1 |
+
+Winbox/SSH: chỉ từ 192.168.10.0/24 và VPN pool 10.10.10.0/24
+
+=======================
+5. VPN – CLIENT TO SITE (WireGuard)
+=======================
+
+Giao thức     : WireGuard (RouterOS v7 native)
+Interface name: wg-vpn
+Listen port   : UDP 13231
+Server IP     : 10.10.10.1/24
+VPN Pool      : 10.10.10.0/24
+
+User: vanhau
+  WireGuard peer allowed-address: 10.10.10.2/32
+  Persistent-keepalive: 25
+
+  ⚠️ WireGuard dùng keypair, KHÔNG dùng username/password
+     Thay vào đó:
+     - Sinh server private/public key
+     - Tạo peer "vanhau" với placeholder public key
+     - Comment rõ chỗ admin điền public key của client vanhau
+     - Xuất kèm client config template đầy đủ trong comment
+
+Client config template (xuất trong comment của config):
+  [Interface]
+  PrivateKey = <VANHAU_PRIVATE_KEY>
+  Address    = 10.10.10.2/24
+  DNS        = 8.8.8.8
+
+  [Peer]
+  PublicKey           = <SERVER_PUBLIC_KEY>
+  Endpoint            = <WAN_IP>:13231
+  AllowedIPs          = 10.10.10.0/24,
+                        192.168.10.0/24,
+                        192.168.0.0/24,
+                        192.168.5.0/24
+  PersistentKeepalive = 25
+
+Routing VPN (split tunnel):
+  Chỉ route các subnet nội bộ qua VPN:
+  - 10.10.10.0/24   (VPN pool)
+  - 192.168.10.0/24 (VLAN 10 Management)
+  - 192.168.0.0/24  (VLAN 60 Office)
+  - 192.168.5.0/24  (VLAN 70 CCTV)
+  Traffic internet đi thẳng, KHÔNG qua VPN
+
+Quyền truy cập VPN pool (10.10.10.0/24):
+  ✅ VLAN 10  : full access
+  ✅ VLAN 60  : full access
+  ✅ VLAN 70  : chỉ 192.168.5.254:8054 và 192.168.5.253:8053
+  ❌ VLAN 20,30,40,50: không truy cập
+
+Firewall VPN (INPUT trên router):
+  Accept UDP 13231 in-interface=pppoe-wan (WireGuard handshake)
+
+Firewall VPN (FORWARD):
+  Accept src=10.10.10.0/24  dst=192.168.10.0/24
+  Accept src=10.10.10.0/24  dst=192.168.0.0/24
+  Accept src=10.10.10.0/24  dst=192.168.5.254  dst-port=8054  protocol=tcp
+  Accept src=10.10.10.0/24  dst=192.168.5.253  dst-port=8053  protocol=tcp
+  Drop   src=10.10.10.0/24  (tất cả còn lại)
+
+=======================
+6. SIP SERVER NỘI BỘ (VLAN 50)
+=======================
+
+IP tĩnh   : 172.16.50.10
+DHCP pool : 172.16.50.100–.200
+Option 66 : "172.16.50.10"
+
+Firewall:
+  SIP nội bộ  : UDP/TCP 5060      VLAN50 → 172.16.50.10
+  RTP nội bộ  : UDP 10000–20000   VLAN50 → 172.16.50.10
+  SIP WAN     : UDP/TCP 5060      VLAN50 → pppoe-wan
+  RTP WAN     : UDP 10000–20000   VLAN50 → pppoe-wan
+
+=======================
+7. CCTV – VLAN 70
+=======================
+
+Access port: ether11–ether16 trên Router, pvid=70, untagged
+
+Firewall VLAN 70:
+  # NVR ra internet (port forwarding hoạt động)
+  Accept src=192.168.5.254   out-interface=pppoe-wan
+  Accept src=192.168.5.253   out-interface=pppoe-wan
+
+  # Camera KHÔNG ra internet
+  Drop   src=192.168.5.1-192.168.5.100  out-interface=pppoe-wan
+
+  # VLAN 10 admin full access VLAN 70
+  Accept src=192.168.10.0/24  dst=192.168.5.0/24
+
+  # VLAN 20–60 và VPN xem NVR nội bộ
+  Accept src=LOCAL_NETS       dst=192.168.5.254  dst-port=8054  protocol=tcp
+  Accept src=LOCAL_NETS       dst=192.168.5.253  dst-port=8053  protocol=tcp
+
+  # Drop tất cả còn lại VLAN 70
+  Drop   src=192.168.5.0/24   inter-VLAN
+  Drop   dst=192.168.5.0/24   inter-VLAN (trừ rule trên)
+
+DST-NAT từ internet:
+  WAN:8054 → 192.168.5.254:8054
+  WAN:8053 → 192.168.5.253:8053
+
+Hairpin NAT:
+  Address-list LOCAL_NETS:
+    172.16.20.0/22, 172.16.30.0/24, 172.16.40.0/24
+    172.16.50.0/24, 192.168.0.0/24, 192.168.10.0/24
+    10.10.10.0/24
+
+  Phương án A (IP nội bộ trực tiếp – mặc định ENABLE):
+    Forward rule: LOCAL_NETS → 192.168.5.254:8054
+    Forward rule: LOCAL_NETS → 192.168.5.253:8053
+
+  Phương án B (hairpin qua WAN IP – mặc định DISABLE):
+    DST-NAT + SRC-NAT masquerade cho LOCAL_NETS → WAN-IP:8054/8053
+    Comment rõ để admin enable khi cần
+
+=======================
+8. ROUTER CONFIG – CCR2004-16G-2S+
+=======================
+
+--- Bước 1: Reset ---
+/system reset-configuration no-defaults=yes skip-backup=yes
+
+--- Bước 2: Bridge + VLAN filtering ---
+  name=bridge-lan, vlan-filtering=yes
+
+  Port vào bridge:
+  ┌────────────────┬──────────────────────────────────┬──────┐
+  │ Interface      │ frame-type                       │ pvid │
+  ├────────────────┼──────────────────────────────────┼──────┤
+  │ sfp-sfpplus1   │ admit-only-vlan-tagged            │  1   │
+  │ ether11        │ admit-only-untagged-and-priority  │  70  │
+  │ ether12        │ admit-only-untagged-and-priority  │  70  │
+  │ ether13        │ admit-only-untagged-and-priority  │  70  │
+  │ ether14        │ admit-only-untagged-and-priority  │  70  │
+  │ ether15        │ admit-only-untagged-and-priority  │  70  │
+  │ ether16        │ admit-only-untagged-and-priority  │  70  │
+  └────────────────┴──────────────────────────────────┴──────┘
+
+--- Bước 3: Bridge VLAN table ---
+  sfp-sfpplus1  tagged   : VLAN 10,20,30,40,50,60,70
+  ether11–16    untagged : VLAN 70 (pvid=70)
+
+--- Bước 4: VLAN Interface ---
+  bridge-lan.10 → 192.168.10.1/24
+  bridge-lan.20 → 172.16.20.1/22
+  bridge-lan.30 → 172.16.30.1/24
+  bridge-lan.40 → 172.16.40.1/24
+  bridge-lan.50 → 172.16.50.1/24
+  bridge-lan.60 → 192.168.0.1/24
+  bridge-lan.70 → 192.168.5.1/24
+
+--- Bước 5: PPPoE ---
+  interface=ether1, name=pppoe-wan
+  user=abcd, password=abcd88qưe
+  add-default-route=yes, use-peer-dns=no
+
+--- Bước 6: DNS ---
+  servers=8.8.8.8,1.1.1.1
+  allow-remote-requests=yes
+
+--- Bước 7: DHCP ---
+  VLAN 20,30,40,50,60: pool + server + network
+  VLAN 10, 70: KHÔNG tạo DHCP
+  VLAN 50: option 66 = "172.16.50.10"
+
+--- Bước 8: NTP ---
+  servers=time.google.com,time.cloudflare.com
+  timezone=Asia/Ho_Chi_Minh
+
+--- Bước 9: WireGuard VPN ---
+  /interface wireguard
+  add name=wg-vpn listen-port=13231 private-key="<AUTO_GENERATE>"
+
+  /interface wireguard peers
+  add interface=wg-vpn name=vanhau
+      public-key="<VANHAU_PUBLIC_KEY_PLACEHOLDER>"
+      allowed-address=10.10.10.2/32
+      persistent-keepalive=25
+
+  /ip address
+  add address=10.10.10.1/24 interface=wg-vpn
+
+  Xuất server public key vào comment để admin gửi cho vanhau
+
+-----------------------
+FIREWALL – CHAIN INPUT
+-----------------------
+
+  R1.  Accept connection-state=established,related
+  R2.  Drop  connection-state=invalid
+  R3.  Accept protocol=icmp      in-interface-list=LAN
+  R4.  Accept dst-port=8291      src=192.168.10.0/24  (Winbox)
+  R5.  Accept dst-port=22        src=192.168.10.0/24  (SSH)
+  R6.  Accept dst-port=8291      src=10.10.10.0/24    (Winbox từ VPN)
+  R7.  Accept dst-port=22        src=10.10.10.0/24    (SSH từ VPN)
+  R8.  Accept protocol=udp       dst-port=13231       (WireGuard handshake)
+  R9.  Drop  in-interface=pppoe-wan
+  R10. Drop  all
+
+-----------------------
+FIREWALL – CHAIN FORWARD
+-----------------------
+
+  # Baseline
+  R1.  Accept connection-state=established,related
+  R2.  Drop  connection-state=invalid
+
+  # Admin
+  R3.  Accept src=192.168.10.0/24
+  R4.  Accept src=192.168.0.0/24   dst=192.168.10.0/24
+
+  # VPN access
+  R5.  Accept src=10.10.10.0/24   dst=192.168.10.0/24
+  R6.  Accept src=10.10.10.0/24   dst=192.168.0.0/24
+  R7.  Accept src=10.10.10.0/24   dst=192.168.5.254   dst-port=8054  protocol=tcp
+  R8.  Accept src=10.10.10.0/24   dst=192.168.5.253   dst-port=8053  protocol=tcp
+  R9.  Drop   src=10.10.10.0/24   (còn lại)
+
+  # Ra internet theo VLAN
+  R10. Accept src=172.16.20.0/22   out-interface=pppoe-wan  (Guest)
+  R11. Accept src=172.16.40.0/24   out-interface=pppoe-wan  (IPTV)
+  R12. Accept src=172.16.30.0/24   out-interface=pppoe-wan  (Manage Wifi)
+  R13. Accept src=192.168.0.0/24   out-interface=pppoe-wan  (Office)
+
+  # VoIP
+  R14. Accept src=172.16.50.0/24   dst=172.16.50.10
+              protocol=udp,tcp     dst-port=5060
+  R15. Accept src=172.16.50.0/24   dst=172.16.50.10
+              protocol=udp         dst-port=10000-20000
+  R16. Accept src=172.16.50.0/24   out-interface=pppoe-wan
+              protocol=udp,tcp     dst-port=5060
+  R17. Accept src=172.16.50.0/24   out-interface=pppoe-wan
+              protocol=udp         dst-port=10000-20000
+
+  # CCTV – NVR ra internet (port forwarding)
+  R18. Accept src=192.168.5.254    out-interface=pppoe-wan
+  R19. Accept src=192.168.5.253    out-interface=pppoe-wan
+
+  # CCTV – camera block internet
+  R20. Drop   src=192.168.5.1-192.168.5.100  out-interface=pppoe-wan
+
+  # CCTV – VLAN 10 admin
+  R21. Accept src=192.168.10.0/24  dst=192.168.5.0/24
+
+  # CCTV – VLAN 20–60 + VPN xem NVR nội bộ (Phương án A)
+  R22. Accept src=LOCAL_NETS  dst=192.168.5.254  dst-port=8054  protocol=tcp
+  R23. Accept src=LOCAL_NETS  dst=192.168.5.253  dst-port=8053  protocol=tcp
+
+  # Default deny
+  R24. Drop  all
+
+-----------------------
+NAT – DSTNAT
+-----------------------
+
+  # DST-NAT từ internet
+  Rule 1: in-interface=pppoe-wan, dst-port=8054, protocol=tcp
+          → to-addresses=192.168.5.254, to-ports=8054
+
+  Rule 2: in-interface=pppoe-wan, dst-port=8053, protocol=tcp
+          → to-addresses=192.168.5.253, to-ports=8053
+
+  # Phương án B Hairpin (DISABLED, comment rõ):
+  Rule 3: src=LOCAL_NETS, dst=[WAN-IP]:8054 → 192.168.5.254:8054  [DISABLED]
+  Rule 4: src=LOCAL_NETS, dst=[WAN-IP]:8053 → 192.168.5.253:8053  [DISABLED]
+
+-----------------------
+NAT – SRCNAT
+-----------------------
+
+  # Masquerade ra WAN
+  Rule 1: out-interface=pppoe-wan → masquerade
+
+  # Phương án B Hairpin SRC-NAT (DISABLED):
+  Rule 2: src=LOCAL_NETS, dst=192.168.5.254 → masquerade  [DISABLED]
+  Rule 3: src=LOCAL_NETS, dst=192.168.5.253 → masquerade  [DISABLED]
+
+-----------------------
+ADDRESS LIST
+-----------------------
+
+  LOCAL_NETS:
+    172.16.20.0/22   # VLAN 20
+    172.16.30.0/24   # VLAN 30
+    172.16.40.0/24   # VLAN 40
+    172.16.50.0/24   # VLAN 50
+    192.168.0.0/24   # VLAN 60
+    192.168.10.0/24  # VLAN 10
+    10.10.10.0/24    # VPN pool
+
+=======================
+9. QoS
+=======================
+
+WAN: 1,000 Mbps
+
+Mangle mark-packet (chain=prerouting, passthrough=yes):
+  172.16.50.0/24  → mark=voip
+  172.16.40.0/24  → mark=iptv
+  172.16.30.0/24  → mark=wifi-mgmt
+  192.168.0.0/24  → mark=office
+  192.168.5.0/24  → mark=cctv
+  172.16.20.0/22  → mark=guest
+
+Queue Tree (out=pppoe-wan):
+  Parent "wan-upload" max-limit=1000M
+  ┌─────────────┬──────────┬──────────┬───────────┐
+  │ Queue       │ Priority │ limit-at │ max-limit │
+  ├─────────────┼──────────┼──────────┼───────────┤
+  │ voip        │    1     │   2M     │  1000M    │
+  │ iptv        │    2     │  50M     │  1000M    │
+  │ wifi-mgmt   │    3     │  10M     │   200M    │
+  │ office      │    4     │ 100M     │  1000M    │
+  │ cctv        │    5     │  20M     │   100M    │
+  │ guest       │    8     │   5M     │    50M    │
+  └─────────────┴──────────┴──────────┴───────────┘
+
+Simple Queue giới hạn Guest download:
+  target=172.16.20.0/22, max-limit=50M/50M, priority=8
+
+=======================
+10. SWITCH CORE – CRS326 (RouterOS v7)
+=======================
+
+/system reset-configuration no-defaults=yes skip-backup=yes
+
+Bridge "bridge-core", vlan-filtering=yes
+
+Tất cả port cấu hình GIỐNG NHAU (trunk tagged all VLAN):
+  frame-type=admit-only-vlan-tagged
+  Tagged VLAN: 10,20,30,40,50,60,70
+
+Port đang sử dụng:
+  sfp-sfpplus1 ← Router  (S+31DLC10D 10G)
+  sfp1         → CSS610  (S-31DLC20D 1G)
+  sfp2         → CRS328  (S-31DLC20D 1G)
+  sfp3–sfp12, sfp-sfpplus2: dự phòng, cấu hình tương tự
+
+Management:
+  VLAN 10: IP 192.168.10.2/24, GW 192.168.10.1
+  Winbox/SSH chỉ từ 192.168.10.0/24 và 10.10.10.0/24
+
+=======================
+11. SWITCH ACCESS – CRS328 (RouterOS v7)
+=======================
+
+/system reset-configuration no-defaults=yes skip-backup=yes
+
+Bridge "bridge-access", vlan-filtering=yes
+
+| Port          | Kết nối          | frame-type             | Tagged VLAN             |
+|---------------|------------------|------------------------|-------------------------|
+| sfp-sfpplus1  | ← Core CRS326    | admit-only-vlan-tagged | 10,20,30,40,50,60,70    |
+|               | S-31DLC20D 1G    |                        |                         |
+| ether1–24     | Chưa cấu hình    | —                      | —                       |
+
+Management:
+  VLAN 10: IP 192.168.10.3/24, GW 192.168.10.1
+
+=======================
+12. CSS610 (SwOS)
+=======================
+
+Cấu hình web http://192.168.10.4
+
+VLAN Table:
+  VLAN 10,20,30,40,50,60,70 → Port 9 (SFP): Tagged
+  (Module S-31DLC20D cắm Port 9)
+
+Port 9: Trunk, tagged all VLAN
+Port 1–8: chưa cấu hình
+
+Management:
+  VLAN=10, IP=192.168.10.4
+  Mask=255.255.255.0, GW=192.168.10.1
+
+=======================
+13. OUTPUT YÊU CẦU
+=======================
+
+Xuất 4 block CLI:
+  [BLOCK 1] ROUTER – CCR2004-16G-2S+
+  [BLOCK 2] CORE SWITCH – CRS326
+  [BLOCK 3] ACCESS SWITCH – CRS328
+  [BLOCK 4] CSS610 (SwOS)
+
+Mỗi block:
+  - VLAN mapping table ở đầu
+  - Port mapping table + module quang ở đầu
+  - Comment (#) từng section
+  - Paste terminal chạy được ngay
+
+=======================
+14. RÀNG BUỘC BẮT BUỘC
+=======================
+
+  ✅ RouterOS v7 syntax — KHÔNG dùng lệnh deprecated v6
+  ✅ Bridge VLAN đúng /interface/bridge/vlan
+  ✅ ether11–16: pvid=70, untagged VLAN 70
+  ✅ sfp-sfpplus1 router: tagged VLAN 10,20,30,40,50,60,70
+  ✅ NVR (192.168.5.253/254) ra internet được
+  ✅ Camera (192.168.5.1–100) block internet
+  ✅ Hairpin NAT: Phương án A enable, Phương án B disable
+  ✅ DST-NAT WAN:8054→NVR-1, WAN:8053→NVR-2
+  ✅ WireGuard VPN: wg-vpn, port 13231, peer vanhau IP 10.10.10.2
+  ✅ VPN split tunnel: chỉ route subnet nội bộ
+  ✅ VPN firewall: chỉ VLAN10, VLAN60, NVR ports
+  ✅ Client config template xuất trong comment
+  ✅ QoS 6 queue đúng priority + limit-at + max-limit
+  ✅ Guest giới hạn 50Mbps up+down
+  ✅ VLAN isolation default deny
+  ✅ Firewall đủ rule, đúng thứ tự
+  ✅ DHCP: VLAN 10,70 không có server
+  ✅ DHCP option 66 VLAN 50
+  ✅ Management tất cả thiết bị qua VLAN 10
+  ✅ NTP + timezone Asia/Ho_Chi_Minh
+  ✅ Không loop mạng
+  ✅ LOCAL_NETS address-list đầy đủ bao gồm VPN pool
