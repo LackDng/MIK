@@ -1,0 +1,110 @@
+============================================================
+BLOCK 4: CSS610-8P-2S+IN (SwOS)
+============================================================
+
+CSS610 chạy SwOS – cấu hình qua Web GUI (KHÔNG có CLI).
+URL sau khi thiết lập: http://192.168.10.4
+
+PORT MAPPING:
++--------+----------------------------------+------------+
+| Port   | Connected to                     | Module     |
++--------+----------------------------------+------------+
+| Port 9 | ← Core CRS326 (uplink trunk)     | S-31DLC20D |
+|        |   1G Single-mode LC-LC OS2       |            |
+| Port 10| Reserved (SFP)                   | —          |
+| Port1–8| PoE access ports (not configured)| —          |
++--------+----------------------------------+------------+
+
+VLAN TABLE:
++------+-------------+----------------------------+
+| VLAN | Name        | Port 9                     |
++------+-------------+----------------------------+
+|   10 | Management  | Tagged (T)                 |
+|   20 | Wifi Guest  | Tagged (T)                 |
+|   30 | Manage Wifi | Tagged (T)                 |
+|   40 | IPTV Cloud  | Tagged (T)                 |
+|   50 | IP Phone    | Tagged (T)                 |
+|   60 | Office      | Tagged (T)                 |
+|   70 | CCTV        | Tagged (T)                 |
++------+-------------+----------------------------+
+
+Management: VLAN 10, IP 192.168.10.4/24, GW 192.168.10.1
+
+============================================================
+HƯỚNG DẪN CẤU HÌNH (Web GUI)
+============================================================
+
+=== Bước 1: Kết nối ban đầu ===
+  - Cắm PC trực tiếp vào Port 1–8 bằng cáp UTP
+  - IP mặc định SwOS: 192.168.88.1
+  - Mở browser: http://192.168.88.1
+  - Login: admin / (không có password)
+
+=== Bước 2: Đặt Management IP ===
+  Tab: System
+    VLAN ID    : 10
+    IP Address : 192.168.10.4
+    Netmask    : 255.255.255.0
+    Gateway    : 192.168.10.1
+    DNS        : 8.8.8.8
+  → Click "Apply"
+  (Sau bước này truy cập qua http://192.168.10.4)
+
+=== Bước 3: Cấu hình VLAN table ===
+  Tab: VLANs
+  Click "Add VLAN" và cấu hình từng dòng:
+
+  VLAN 10  | Name: Management
+    Port 9: T    | Port 1–8: — | Port 10: —
+
+  VLAN 20  | Name: WifiGuest
+    Port 9: T    | Port 1–8: — | Port 10: —
+
+  VLAN 30  | Name: ManageWifi
+    Port 9: T    | Port 1–8: — | Port 10: —
+
+  VLAN 40  | Name: IPTV
+    Port 9: T    | Port 1–8: — | Port 10: —
+
+  VLAN 50  | Name: IPPhone
+    Port 9: T    | Port 1–8: — | Port 10: —
+
+  VLAN 60  | Name: Office
+    Port 9: T    | Port 1–8: — | Port 10: —
+
+  VLAN 70  | Name: CCTV
+    Port 9: T    | Port 1–8: — | Port 10: —
+
+  → Click "Apply" sau khi thêm đủ 7 VLAN
+
+=== Bước 4: Cấu hình Port 9 ===
+  Tab: Ports → Port 9
+    Default VLAN ID (PVID): 1   (giữ nguyên – port là trunk tagged)
+    VLAN Mode: Enabled
+  → Apply
+
+=== Bước 5: Cấu hình Port 1–8 (khi cần gán access) ===
+  Ví dụ – gán Port 1 vào VLAN 60 (Office):
+    Tab: VLANs → VLAN 60 → Port 1: U (Untagged)
+    Tab: Ports → Port 1 → PVID: 60
+  → Apply
+
+=== Bước 6: Save ===
+  Tab: System → Click "Save Configuration"
+  (quan trọng – nếu không save, cấu hình mất sau khi reboot)
+
+============================================================
+KIỂM TRA SAU CẤU HÌNH
+============================================================
+
+Sau khi cắm SFP S-31DLC20D vào Port 9 và kết nối lên CRS326 sfp1:
+
+  Từ Router (CCR2004):
+    /ping 192.168.10.4
+
+  Từ máy trong VLAN 10:
+    Truy cập http://192.168.10.4
+
+  Kiểm tra link:
+    Tab: Overview → Port 9 phải hiện "1G FD"
+    (1G Full Duplex – auto-negotiated từ 10G port của CRS326)
