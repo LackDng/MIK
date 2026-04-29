@@ -132,7 +132,9 @@ add interface=ether1 name=pppoe-wan \
 # STEP 6: DNS
 # ============================================================
 /ip dns
-set servers=8.8.8.8,1.1.1.1 allow-remote-requests=yes
+set servers=8.8.8.8,1.1.1.1 allow-remote-requests=no
+# allow-remote-requests=no: router không làm public DNS resolver
+# DHCP đã push 8.8.8.8,1.1.1.1 thẳng cho client nên không cần
 
 # ============================================================
 # STEP 7: DHCP SERVERS
@@ -284,65 +286,132 @@ add list=LOCAL_NETS address=10.10.10.0/24   comment="VPN pool"
 
 # ============================================================
 # STEP 12: FIREWALL – CHAIN INPUT
+# Thứ tự rule quan trọng – đặt theo đúng trình tự bên dưới
 # ============================================================
 /ip firewall filter
 
-# R1: Accept established/related (stateful baseline)
+# ── BASELINE ──────────────────────────────────────────────
+# R1: Accept established/related – ưu tiên đầu để tối ưu CPU
 add chain=input action=accept \
     connection-state=established,related \
     comment="R1 Accept established/related"
 
-# R2: Drop invalid
+# R2: Drop invalid – chống replay attack, gói lỗi
 add chain=input action=drop \
     connection-state=invalid \
     comment="R2 Drop invalid"
 
-# R3: Accept ICMP from LAN
+# ── BRUTE-FORCE PROTECTION ────────────────────────────────
+# Cơ chế: 3 lần kết nối mới (SSH/Winbox) trong 60s → blacklist 1h
+# Drop phải đặt TRƯỚC các rule detect để IP bị block không bao giờ qua
+
+# R3: Drop IP trong blacklist brute-force
+add chain=input action=drop \
+    src-address-list=brute_force \
+    log=yes log-prefix="BF-DROP: " \
+    comment="R3 Drop brute-force blacklisted IPs"
+
+# R4: Stage 3 – attempt thứ 3 → thêm vào blacklist 1h
+add chain=input action=add-src-to-address-list \
+    protocol=tcp dst-port=22,8291 connection-state=new \
+    src-address-list=bf_stage2 \
+    address-list=brute_force address-list-timeout=1h \
+    comment="R4 Brute-force stage3 – blacklist 1h"
+
+# R5: Stage 2 – attempt thứ 2
+add chain=input action=add-src-to-address-list \
+    protocol=tcp dst-port=22,8291 connection-state=new \
+    src-address-list=bf_stage1 \
+    address-list=bf_stage2 address-list-timeout=1m \
+    comment="R5 Brute-force stage2"
+
+# R6: Stage 1 – attempt đầu tiên
+add chain=input action=add-src-to-address-list \
+    protocol=tcp dst-port=22,8291 connection-state=new \
+    address-list=bf_stage1 address-list-timeout=1m \
+    comment="R6 Brute-force stage1"
+
+# ── ICMP RATE LIMIT ───────────────────────────────────────
+# R7: Accept ICMP từ LAN, tối đa 10 gói/giây (burst 5)
 add chain=input action=accept \
     protocol=icmp in-interface-list=LAN \
-    comment="R3 ICMP from LAN"
+    limit=10,5:packet \
+    comment="R7 ICMP from LAN rate-limited 10pps"
 
-# R4: Accept DNS from LAN (clients use router as resolver)
-add chain=input action=accept \
-    protocol=udp dst-port=53 in-interface-list=LAN \
-    comment="R4 DNS UDP from LAN"
-add chain=input action=accept \
-    protocol=tcp dst-port=53 in-interface-list=LAN \
-    comment="R4 DNS TCP from LAN"
+# R8: Drop ICMP vượt giới hạn (ping flood)
+add chain=input action=drop \
+    protocol=icmp in-interface-list=LAN \
+    comment="R8 Drop excess ICMP from LAN"
 
-# R5: Winbox from Management VLAN
+# ── ALLOW MANAGEMENT ──────────────────────────────────────
+# R9: Winbox từ VLAN10 Management
 add chain=input action=accept \
     protocol=tcp dst-port=8291 src-address=192.168.10.0/24 \
-    comment="R5 Winbox from VLAN10"
+    comment="R9 Winbox from VLAN10"
 
-# R6: SSH from Management VLAN
+# R10: SSH từ VLAN10 Management
 add chain=input action=accept \
     protocol=tcp dst-port=22 src-address=192.168.10.0/24 \
-    comment="R6 SSH from VLAN10"
+    comment="R10 SSH from VLAN10"
 
-# R7: Winbox from VPN
+# R11: Winbox từ VPN
 add chain=input action=accept \
     protocol=tcp dst-port=8291 src-address=10.10.10.0/24 \
-    comment="R7 Winbox from VPN"
+    comment="R11 Winbox from VPN"
 
-# R8: SSH from VPN
+# R12: SSH từ VPN
 add chain=input action=accept \
     protocol=tcp dst-port=22 src-address=10.10.10.0/24 \
-    comment="R8 SSH from VPN"
+    comment="R12 SSH from VPN"
 
-# R9: WireGuard handshake from WAN
+# R13: WireGuard handshake từ WAN
 add chain=input action=accept \
     protocol=udp dst-port=13231 in-interface=pppoe-wan \
-    comment="R9 WireGuard UDP 13231 from WAN"
+    comment="R13 WireGuard UDP 13231 from WAN"
 
-# R10: Drop all from WAN
+# ── EXPLICIT WAN PORT DROPS (defense-in-depth) ────────────
+# Các rule sau redundant với R19, nhưng explicit để dễ audit/log
+
+# R14: Block Winbox từ WAN
+add chain=input action=drop \
+    protocol=tcp dst-port=8291 in-interface=pppoe-wan \
+    log=yes log-prefix="WAN-WINBOX: " \
+    comment="R14 Drop Winbox from WAN"
+
+# R15: Block SSH từ WAN
+add chain=input action=drop \
+    protocol=tcp dst-port=22 in-interface=pppoe-wan \
+    log=yes log-prefix="WAN-SSH: " \
+    comment="R15 Drop SSH from WAN"
+
+# R16: Block Telnet từ WAN
+add chain=input action=drop \
+    protocol=tcp dst-port=23 in-interface=pppoe-wan \
+    log=yes log-prefix="WAN-TELNET: " \
+    comment="R16 Drop Telnet from WAN"
+
+# R17: Block MikroTik API từ WAN
+add chain=input action=drop \
+    protocol=tcp dst-port=8728,8729 in-interface=pppoe-wan \
+    log=yes log-prefix="WAN-API: " \
+    comment="R17 Drop API/API-SSL from WAN"
+
+# R18: Block HTTP/HTTPS management từ WAN
+add chain=input action=drop \
+    protocol=tcp dst-port=80,443 in-interface=pppoe-wan \
+    log=yes log-prefix="WAN-HTTP: " \
+    comment="R18 Drop HTTP/HTTPS from WAN"
+
+# ── DEFAULT DROP ──────────────────────────────────────────
+# R19: Drop toàn bộ còn lại từ WAN
 add chain=input action=drop \
     in-interface=pppoe-wan \
-    comment="R10 Drop all from WAN"
+    log=yes log-prefix="WAN-INPUT-DROP: " \
+    comment="R19 Drop all from WAN"
 
-# R11: Default drop INPUT
+# R20: Default drop tất cả còn lại
 add chain=input action=drop \
-    comment="R11 Default drop INPUT"
+    comment="R20 Default drop INPUT"
 
 # ============================================================
 # STEP 13: FIREWALL – CHAIN FORWARD
@@ -357,6 +426,42 @@ add chain=forward action=accept \
 add chain=forward action=drop \
     connection-state=invalid \
     comment="R2 Drop invalid"
+
+# ── CHỐNG DDoS / SYN FLOOD ────────────────────────────────
+# R2a: Drop IP trong blacklist SYN flood
+add chain=forward action=drop \
+    src-address-list=syn_flood \
+    in-interface=pppoe-wan \
+    log=yes log-prefix="SYN-FLOOD-DROP: " \
+    comment="R2a Drop SYN flood blacklisted IPs"
+
+# R2b: Phát hiện SYN flood (>50 SYN/s per src IP → blacklist 2 phút)
+# limit=50,100:src-address = cho phép 50 SYN/s burst 100, tính theo src IP
+add chain=forward action=add-src-to-address-list \
+    protocol=tcp tcp-flags=syn connection-state=new \
+    in-interface=pppoe-wan \
+    limit=50,100:src-address \
+    address-list=syn_flood address-list-timeout=2m \
+    comment="R2b Detect SYN flood >50/s per IP"
+
+# R2c: Connection limit – drop nếu 1 IP mở >100 kết nối TCP đồng thời
+add chain=forward action=drop \
+    protocol=tcp connection-limit=100,32 \
+    in-interface=pppoe-wan \
+    log=yes log-prefix="CONN-LIMIT: " \
+    comment="R2c Drop if WAN src >100 concurrent TCP connections"
+
+# R2d: Drop kết nối MỚI từ WAN vào LAN (không phải port-forwarding)
+# connection-nat-state=dstnat: cho phép các kết nối đã được DSTNAT (NVR forward)
+add chain=forward action=accept \
+    in-interface=pppoe-wan connection-state=new \
+    connection-nat-state=dstnat \
+    comment="R2d Accept new WAN connections via DSTNAT (port forwarding)"
+
+add chain=forward action=drop \
+    in-interface=pppoe-wan connection-state=new \
+    log=yes log-prefix="WAN-NEW-DROP: " \
+    comment="R2e Drop new connections from WAN (not DSTNAT'd)"
 
 # R3: VLAN10 admin – full forward access
 add chain=forward action=accept \
@@ -472,6 +577,7 @@ add chain=forward action=accept protocol=tcp \
 
 # R24: Default deny all forward
 add chain=forward action=drop \
+    log=yes log-prefix="FWD-DROP: " \
     comment="R24 Default deny FORWARD"
 
 # ============================================================
@@ -617,3 +723,25 @@ set allowed-interface-list=MGMT
 # Neighbor discovery chỉ nội bộ LAN (không quảng bá ra WAN)
 /ip neighbor discovery-settings
 set discover-interface-list=LAN
+
+# ============================================================
+# STEP 20: SCHEDULED BACKUP
+# Tự động export config mỗi tuần vào flash router
+# ============================================================
+/system scheduler
+add name=weekly-backup interval=7d start-time=02:00:00 \
+    on-event="/export compact file=router-weekly-backup" \
+    comment="Weekly config backup to router flash"
+
+# ============================================================
+# STEP 21: USER ACCOUNT HARDENING
+# !! Bắt buộc thực hiện THỦ CÔNG trước khi đưa vào production !!
+# ============================================================
+# 1. Tạo tài khoản admin mới với tên và mật khẩu mạnh:
+#    /user add name=<TEN_ADMIN_MOI> password="<MAT_KHAU_MANH>" group=full
+#
+# 2. Đăng nhập lại bằng tài khoản mới, sau đó xóa tài khoản "admin" mặc định:
+#    /user remove admin
+#
+# Mật khẩu mạnh: tối thiểu 16 ký tự, gồm chữ hoa/thường/số/ký tự đặc biệt
+# Không dùng các mật khẩu phổ biến như: admin, mikrotik, 1234, password

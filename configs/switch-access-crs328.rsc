@@ -82,17 +82,67 @@ set servers=8.8.8.8,1.1.1.1
 add chain=input action=accept \
     connection-state=established,related \
     comment="Accept established/related"
+add chain=input action=drop \
+    connection-state=invalid \
+    comment="Drop invalid"
+add chain=input action=drop \
+    src-address-list=brute_force \
+    log=yes log-prefix="BF-DROP: " \
+    comment="Drop brute-force blacklisted IPs"
+add chain=input action=add-src-to-address-list \
+    protocol=tcp dst-port=22,8291 connection-state=new \
+    src-address-list=bf_stage2 \
+    address-list=brute_force address-list-timeout=1h \
+    comment="Brute-force stage3 – blacklist 1h"
+add chain=input action=add-src-to-address-list \
+    protocol=tcp dst-port=22,8291 connection-state=new \
+    src-address-list=bf_stage1 \
+    address-list=bf_stage2 address-list-timeout=1m \
+    comment="Brute-force stage2"
+add chain=input action=add-src-to-address-list \
+    protocol=tcp dst-port=22,8291 connection-state=new \
+    address-list=bf_stage1 address-list-timeout=1m \
+    comment="Brute-force stage1"
 add chain=input action=accept \
-    src-address=192.168.10.0/24 \
+    protocol=icmp limit=10,5:packet \
+    comment="ICMP rate-limited 10pps"
+add chain=input action=drop \
+    protocol=icmp \
+    comment="Drop excess ICMP"
+add chain=input action=accept \
+    protocol=tcp dst-port=22,8291 src-address=192.168.10.0/24 \
     comment="Allow Winbox/SSH from VLAN10"
 add chain=input action=accept \
-    src-address=10.10.10.0/24 \
+    protocol=tcp dst-port=22,8291 src-address=10.10.10.0/24 \
     comment="Allow Winbox/SSH from VPN"
 add chain=input action=drop \
-    comment="Drop all other input"
+    log=yes log-prefix="SW-DROP: " \
+    comment="Default drop all other input"
 
 # ============================================================
-# STEP 6: NTP + SYSTEM
+# STEP 6: SERVICES HARDENING
+# ============================================================
+/ip service
+set telnet   disabled=yes
+set ftp      disabled=yes
+set www      disabled=yes
+set www-ssl  disabled=yes
+set api      disabled=yes
+set api-ssl  disabled=yes
+set ssh      port=22   allowed-from=192.168.10.0/24,10.10.10.0/24
+set winbox   port=8291 allowed-from=192.168.10.0/24,10.10.10.0/24
+
+/tool bandwidth-server
+set enabled=no
+
+/tool mac-server
+set allowed-interface-list=none
+
+/tool mac-server mac-winbox
+set allowed-interface-list=none
+
+# ============================================================
+# STEP 7: NTP + SYSTEM
 # ============================================================
 /system identity
 set name=CRS328-Access
@@ -104,3 +154,12 @@ add address=time.google.com
 add address=time.cloudflare.com
 /system clock
 set time-zone-name=Asia/Ho_Chi_Minh
+
+/system scheduler
+add name=weekly-backup interval=7d start-time=03:00:00 \
+    on-event="/export compact file=crs328-weekly-backup" \
+    comment="Weekly config backup"
+
+# !! Đổi tài khoản admin mặc định trước khi production:
+# /user add name=<TEN_MOI> password="<MAT_KHAU_MANH>" group=full
+# /user remove admin
