@@ -129,8 +129,8 @@ set www      disabled=yes
 set www-ssl  disabled=yes
 set api      disabled=yes
 set api-ssl  disabled=yes
-set ssh      port=22   allowed-from=192.168.10.0/24,10.10.10.0/24
-set winbox   port=8291 allowed-from=192.168.10.0/24,10.10.10.0/24
+set ssh      port=22   address=192.168.10.0/24,10.10.10.0/24
+set winbox   port=8291 address=192.168.10.0/24,10.10.10.0/24
 
 /tool bandwidth-server
 set enabled=no
