@@ -435,12 +435,11 @@ add chain=forward action=drop \
     log=yes log-prefix="SYN-FLOOD-DROP: " \
     comment="R2a Drop SYN flood blacklisted IPs"
 
-# R2b: Phát hiện SYN flood (>50 SYN/s per src IP → blacklist 2 phút)
-# limit=50,100:src-address = cho phép 50 SYN/s burst 100, tính theo src IP
+# R2b: Phát hiện SYN flood (>50 SYN/s burst 100 → blacklist 2 phút)
 add chain=forward action=add-src-to-address-list \
     protocol=tcp tcp-flags=syn connection-state=new \
     in-interface=pppoe-wan \
-    limit=50,100:src-address \
+    limit=50,100:packet \
     address-list=syn_flood address-list-timeout=2m \
     comment="R2b Detect SYN flood >50/s per IP"
 
