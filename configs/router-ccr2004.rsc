@@ -125,13 +125,21 @@ add address=192.168.0.1/24  interface=bridge-lan.60 comment="VLAN60 Office GW"
 add address=192.168.5.1/24  interface=bridge-lan.70 comment="VLAN70 CCTV GW"
 
 # ============================================================
-# STEP 5: PPPOE WAN
+# STEP 5: WAN – DHCP CLIENT
+# Dùng DHCP client khi nhận IP từ router upstream (modem/router ISP).
+# Nếu ISP dùng PPPoE, comment DHCP và dùng PPPoE bên dưới.
 # ============================================================
-/interface pppoe-client
-add interface=ether1 name=pppoe-wan \
-    user=abcd password="abcd88qưe" \
-    add-default-route=yes use-peer-dns=no \
-    disabled=no comment="WAN PPPoE to ISP – 1Gbps"
+/ip dhcp-client
+add interface=ether1 add-default-route=yes use-peer-dns=no \
+    disabled=no comment="WAN DHCP from upstream router"
+
+# ---- PPPoE (bật khi ISP dùng PPPoE thay DHCP) ----
+# /interface pppoe-client
+# add interface=ether1 name=pppoe-wan \
+#     user=<PPPoE_USER> password="<PPPoE_PASS>" \
+#     add-default-route=yes use-peer-dns=no \
+#     disabled=no comment="WAN PPPoE to ISP"
+# ---- Nếu dùng PPPoE: đổi WAN list member thành pppoe-wan ----
 
 # ============================================================
 # STEP 6: DNS
@@ -266,7 +274,7 @@ add name=WAN  comment="WAN interfaces"
 add name=LAN  comment="LAN VLAN interfaces"
 add name=MGMT comment="Management only – VLAN10"
 /interface list member
-add interface=pppoe-wan     list=WAN
+add interface=ether1        list=WAN
 add interface=bridge-lan.10 list=LAN
 add interface=bridge-lan.20 list=LAN
 add interface=bridge-lan.30 list=LAN
@@ -371,7 +379,7 @@ add chain=input action=accept \
 
 # R13: WireGuard handshake từ WAN
 add chain=input action=accept \
-    protocol=udp dst-port=13231 in-interface=pppoe-wan \
+    protocol=udp dst-port=13231 in-interface-list=WAN \
     comment="R13 WireGuard UDP 13231 from WAN"
 
 # ── EXPLICIT WAN PORT DROPS (defense-in-depth) ────────────
@@ -379,38 +387,38 @@ add chain=input action=accept \
 
 # R14: Block Winbox từ WAN
 add chain=input action=drop \
-    protocol=tcp dst-port=8291 in-interface=pppoe-wan \
+    protocol=tcp dst-port=8291 in-interface-list=WAN \
     log=yes log-prefix="WAN-WINBOX: " \
     comment="R14 Drop Winbox from WAN"
 
 # R15: Block SSH từ WAN
 add chain=input action=drop \
-    protocol=tcp dst-port=22 in-interface=pppoe-wan \
+    protocol=tcp dst-port=22 in-interface-list=WAN \
     log=yes log-prefix="WAN-SSH: " \
     comment="R15 Drop SSH from WAN"
 
 # R16: Block Telnet từ WAN
 add chain=input action=drop \
-    protocol=tcp dst-port=23 in-interface=pppoe-wan \
+    protocol=tcp dst-port=23 in-interface-list=WAN \
     log=yes log-prefix="WAN-TELNET: " \
     comment="R16 Drop Telnet from WAN"
 
 # R17: Block MikroTik API từ WAN
 add chain=input action=drop \
-    protocol=tcp dst-port=8728,8729 in-interface=pppoe-wan \
+    protocol=tcp dst-port=8728,8729 in-interface-list=WAN \
     log=yes log-prefix="WAN-API: " \
     comment="R17 Drop API/API-SSL from WAN"
 
 # R18: Block HTTP/HTTPS management từ WAN
 add chain=input action=drop \
-    protocol=tcp dst-port=80,443 in-interface=pppoe-wan \
+    protocol=tcp dst-port=80,443 in-interface-list=WAN \
     log=yes log-prefix="WAN-HTTP: " \
     comment="R18 Drop HTTP/HTTPS from WAN"
 
 # ── DEFAULT DROP ──────────────────────────────────────────
 # R19: Drop toàn bộ còn lại từ WAN
 add chain=input action=drop \
-    in-interface=pppoe-wan \
+    in-interface-list=WAN \
     log=yes log-prefix="WAN-INPUT-DROP: " \
     comment="R19 Drop all from WAN"
 
@@ -436,14 +444,14 @@ add chain=forward action=drop \
 # R2a: Drop IP trong blacklist SYN flood
 add chain=forward action=drop \
     src-address-list=syn_flood \
-    in-interface=pppoe-wan \
+    in-interface-list=WAN \
     log=yes log-prefix="SYN-FLOOD-DROP: " \
     comment="R2a Drop SYN flood blacklisted IPs"
 
 # R2b: Phát hiện SYN flood (>50 SYN/s burst 100 → blacklist 2 phút)
 add chain=forward action=add-src-to-address-list \
     protocol=tcp tcp-flags=syn connection-state=new \
-    in-interface=pppoe-wan \
+    in-interface-list=WAN \
     limit=50,100:packet \
     address-list=syn_flood address-list-timeout=2m \
     comment="R2b Detect SYN flood >50/s per IP"
@@ -451,19 +459,19 @@ add chain=forward action=add-src-to-address-list \
 # R2c: Connection limit – drop nếu 1 IP mở >100 kết nối TCP đồng thời
 add chain=forward action=drop \
     protocol=tcp connection-limit=100,32 \
-    in-interface=pppoe-wan \
+    in-interface-list=WAN \
     log=yes log-prefix="CONN-LIMIT: " \
     comment="R2c Drop if WAN src >100 concurrent TCP connections"
 
 # R2d: Drop kết nối MỚI từ WAN vào LAN (không phải port-forwarding)
 # connection-nat-state=dstnat: cho phép các kết nối đã được DSTNAT (NVR forward)
 add chain=forward action=accept \
-    in-interface=pppoe-wan connection-state=new \
+    in-interface-list=WAN connection-state=new \
     connection-nat-state=dstnat \
     comment="R2d Accept new WAN connections via DSTNAT (port forwarding)"
 
 add chain=forward action=drop \
-    in-interface=pppoe-wan connection-state=new \
+    in-interface-list=WAN connection-state=new \
     log=yes log-prefix="WAN-NEW-DROP: " \
     comment="R2e Drop new connections from WAN (not DSTNAT'd)"
 
@@ -504,22 +512,22 @@ add chain=forward action=drop \
 
 # R10: VLAN20 Guest → internet
 add chain=forward action=accept \
-    src-address=172.16.20.0/22 out-interface=pppoe-wan \
+    src-address=172.16.20.0/22 out-interface-list=WAN \
     comment="R10 VLAN20 Guest internet"
 
 # R11: VLAN40 IPTV → internet
 add chain=forward action=accept \
-    src-address=172.16.40.0/24 out-interface=pppoe-wan \
+    src-address=172.16.40.0/24 out-interface-list=WAN \
     comment="R11 VLAN40 IPTV internet"
 
 # R12: VLAN30 Manage Wifi → internet
 add chain=forward action=accept \
-    src-address=172.16.30.0/24 out-interface=pppoe-wan \
+    src-address=172.16.30.0/24 out-interface-list=WAN \
     comment="R12 VLAN30 Manage Wifi internet"
 
 # R13: VLAN60 Office → internet
 add chain=forward action=accept \
-    src-address=192.168.0.0/24 out-interface=pppoe-wan \
+    src-address=192.168.0.0/24 out-interface-list=WAN \
     comment="R13 VLAN60 Office internet"
 
 # R14: VLAN50 SIP internal (TCP+UDP 5060 → SIP server)
@@ -537,31 +545,31 @@ add chain=forward action=accept protocol=udp \
 
 # R16: VLAN50 SIP → WAN
 add chain=forward action=accept protocol=tcp \
-    src-address=172.16.50.0/24 out-interface=pppoe-wan dst-port=5060 \
+    src-address=172.16.50.0/24 out-interface-list=WAN dst-port=5060 \
     comment="R16 VoIP SIP TCP to WAN"
 add chain=forward action=accept protocol=udp \
-    src-address=172.16.50.0/24 out-interface=pppoe-wan dst-port=5060 \
+    src-address=172.16.50.0/24 out-interface-list=WAN dst-port=5060 \
     comment="R16 VoIP SIP UDP to WAN"
 
 # R17: VLAN50 RTP → WAN
 add chain=forward action=accept protocol=udp \
-    src-address=172.16.50.0/24 out-interface=pppoe-wan dst-port=10000-20000 \
+    src-address=172.16.50.0/24 out-interface-list=WAN dst-port=10000-20000 \
     comment="R17 VoIP RTP to WAN"
 
 # R18: NVR-1 → internet (cloud CCTV / port forwarding)
 add chain=forward action=accept \
-    src-address=192.168.5.254 out-interface=pppoe-wan \
+    src-address=192.168.5.254 out-interface-list=WAN \
     comment="R18 NVR-1 internet access"
 
 # R19: NVR-2 → internet
 add chain=forward action=accept \
-    src-address=192.168.5.253 out-interface=pppoe-wan \
+    src-address=192.168.5.253 out-interface-list=WAN \
     comment="R19 NVR-2 internet access"
 
 # R20: Block cameras (192.168.5.1-100) from internet
 # NVR (.253/.254) already accepted above – this drops remaining VLAN70
 add chain=forward action=drop \
-    src-address=192.168.5.0/24 out-interface=pppoe-wan \
+    src-address=192.168.5.0/24 out-interface-list=WAN \
     comment="R20 Drop CCTV cameras to internet"
 
 # R21: VLAN10 admin full access to VLAN70 CCTV
@@ -591,13 +599,13 @@ add chain=forward action=drop \
 
 # WAN:8054 → NVR-1
 add chain=dstnat action=dst-nat \
-    in-interface=pppoe-wan protocol=tcp dst-port=8054 \
+    in-interface-list=WAN protocol=tcp dst-port=8054 \
     to-addresses=192.168.5.254 to-ports=8054 \
     comment="DSTNAT WAN:8054 to NVR-1"
 
 # WAN:8053 → NVR-2
 add chain=dstnat action=dst-nat \
-    in-interface=pppoe-wan protocol=tcp dst-port=8053 \
+    in-interface-list=WAN protocol=tcp dst-port=8053 \
     to-addresses=192.168.5.253 to-ports=8053 \
     comment="DSTNAT WAN:8053 to NVR-2"
 
@@ -621,7 +629,7 @@ add chain=dstnat action=dst-nat \
 
 # Masquerade all outbound WAN traffic
 add chain=srcnat action=masquerade \
-    out-interface=pppoe-wan \
+    out-interface-list=WAN \
     comment="SRCNAT Masquerade to WAN"
 
 # ---- Hairpin Option B SRC-NAT (DISABLED) ----
@@ -652,7 +660,7 @@ add chain=prerouting action=mark-packet new-packet-mark=guest passthrough=yes \
     src-address=172.16.20.0/22 comment="QoS mark Guest"
 
 # ============================================================
-# STEP 17: QoS – QUEUE TREE (upload on pppoe-wan)
+# STEP 17: QoS – QUEUE TREE (upload on WAN interface)
 # +-------------+----------+----------+-----------+
 # | Queue       | Priority | limit-at | max-limit |
 # +-------------+----------+----------+-----------+
@@ -665,7 +673,7 @@ add chain=prerouting action=mark-packet new-packet-mark=guest passthrough=yes \
 # +-------------+----------+----------+-----------+
 # ============================================================
 /queue tree
-add name=wan-upload parent=pppoe-wan max-limit=1000M \
+add name=wan-upload parent=ether1 max-limit=1000M \
     comment="WAN upload parent – 1Gbps"
 
 add name=q-voip      parent=wan-upload packet-mark=voip \
