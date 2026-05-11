@@ -85,6 +85,12 @@ add chain=input action=accept \
 add chain=input action=drop \
     connection-state=invalid \
     comment="Drop invalid"
+add chain=input action=accept \
+    src-address=192.168.10.0/24 \
+    comment="Whitelist VLAN10 – bypass brute-force check"
+add chain=input action=accept \
+    src-address=10.10.10.0/24 \
+    comment="Whitelist VPN – bypass brute-force check"
 add chain=input action=drop \
     src-address-list=brute_force \
     log=yes log-prefix="BF-DROP: " \
@@ -109,12 +115,6 @@ add chain=input action=accept \
 add chain=input action=drop \
     protocol=icmp \
     comment="Drop excess ICMP"
-add chain=input action=accept \
-    protocol=tcp dst-port=22,8291 src-address=192.168.10.0/24 \
-    comment="Allow Winbox/SSH from VLAN10"
-add chain=input action=accept \
-    protocol=tcp dst-port=22,8291 src-address=10.10.10.0/24 \
-    comment="Allow Winbox/SSH from VPN"
 add chain=input action=drop \
     log=yes log-prefix="SW-DROP: " \
     comment="Default drop all other input"
