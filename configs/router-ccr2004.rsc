@@ -23,7 +23,8 @@
 # | ether1         | WAN – PPPoE to ISP modem (copper)             |
 # | sfp-sfpplus1   | Trunk to Core CRS326 (S+31DLC10D 10G SMF)    |
 # | sfp-sfpplus2   | Reserved (not used)                           |
-# | ether2-ether10 | Reserved (not used)                           |
+# | ether2         | VLAN 10 ACCESS – Management (direct PC access) |
+| ether3-ether10 | Reserved (not used)                           |
 # | ether11-ether16| VLAN 70 ACCESS – Camera/NVR (untagged pvid=70)|
 # +----------------+-----------------------------------------------+
 #
@@ -57,6 +58,9 @@ add name=bridge-lan vlan-filtering=yes comment="Main LAN bridge"
 add bridge=bridge-lan interface=sfp-sfpplus1 \
     frame-types=admit-only-vlan-tagged \
     comment="Trunk uplink to Core CRS326"
+add bridge=bridge-lan interface=ether2 \
+    pvid=10 frame-types=admit-only-untagged-and-priority-tagged \
+    comment="VLAN10 Management – direct PC access"
 add bridge=bridge-lan interface=ether11 \
     pvid=70 frame-types=admit-only-untagged-and-priority-tagged \
     comment="VLAN70 CCTV access"
@@ -83,7 +87,8 @@ add bridge=bridge-lan interface=ether16 \
 # ============================================================
 /interface bridge vlan
 add bridge=bridge-lan vlan-ids=10 \
-    tagged=bridge-lan,sfp-sfpplus1
+    tagged=bridge-lan,sfp-sfpplus1 \
+    untagged=ether2
 add bridge=bridge-lan vlan-ids=20 \
     tagged=bridge-lan,sfp-sfpplus1
 add bridge=bridge-lan vlan-ids=30 \
