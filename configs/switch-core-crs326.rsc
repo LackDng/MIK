@@ -3,21 +3,25 @@
 # RouterOS v7 – Layer 2 only
 # ============================================================
 #
-# PORT MAPPING TABLE:
-# +----------------+---------------------------------------+------------+
-# | Interface      | Connected to                          | Module     |
-# +----------------+---------------------------------------+------------+
-# | sfp-sfpplus1   | ← Router CCR2004 (uplink)             | S+31DLC10D |
-# |                |   10G Single-mode LC-LC OS2           |            |
-# | sfp1           | → CSS610 (downlink)                   | S-31DLC20D |
-# |                |   1G Single-mode LC-LC OS2            |            |
-# | sfp2           | → CRS328 (downlink)                   | S-31DLC20D |
-# |                |   1G Single-mode LC-LC OS2            |            |
-# | sfp3–sfp12     | Reserved (trunk all VLAN)             | —          |
-# | sfp-sfpplus2   | Reserved (trunk all VLAN)             | —          |
-# +----------------+---------------------------------------+------------+
+# CRS326-24S+2Q+RM: 24 cổng SFP/SFP+ đều tên sfp-sfpplus1–24
+#                   2 cổng QSFP+ (qsfpplus1, qsfpplus2)
+#                   KHÔNG có cổng tên "sfp1", "sfp2" v.v.
 #
-# ALL PORTS: trunk tagged VLAN 10,20,30,40,50,60,70
+# PORT MAPPING TABLE:
+# +------------------+---------------------------------------+------------+
+# | Interface        | Connected to                          | Module     |
+# +------------------+---------------------------------------+------------+
+# | sfp-sfpplus1     | ← Router CCR2004 (uplink)             | S+31DLC10D |
+# |                  |   10G Single-mode LC-LC OS2           |            |
+# | sfp-sfpplus2     | → CSS610 (downlink)                   | S-31DLC20D |
+# |                  |   1G Single-mode LC-LC OS2            |            |
+# | sfp-sfpplus3     | → CRS328 (downlink)                   | S-31DLC20D |
+# |                  |   1G Single-mode LC-LC OS2            |            |
+# | sfp-sfpplus4–14  | Reserved (trunk all VLAN)             | —          |
+# | sfp-sfpplus15–24 | Reserved (chưa thêm vào bridge)       | —          |
+# +------------------+---------------------------------------+------------+
+#
+# ALL ACTIVE PORTS: trunk tagged VLAN 10,20,30,40,50,60,70
 # Management: 192.168.10.2/24 via VLAN 10
 # ============================================================
 
@@ -33,71 +37,70 @@
 /interface bridge
 add name=bridge-core vlan-filtering=yes comment="Core switch bridge – L2 only"
 
-# Add all active and reserved trunk ports
+# Add trunk ports (sfp-sfpplus1–14; thêm sfp-sfpplus15–24 nếu cần)
 /interface bridge port
 add bridge=bridge-core interface=sfp-sfpplus1 \
     frame-types=admit-only-vlan-tagged \
     comment="Uplink to Router CCR2004"
-add bridge=bridge-core interface=sfp1 \
+add bridge=bridge-core interface=sfp-sfpplus2 \
     frame-types=admit-only-vlan-tagged \
     comment="Downlink to CSS610"
-add bridge=bridge-core interface=sfp2 \
+add bridge=bridge-core interface=sfp-sfpplus3 \
     frame-types=admit-only-vlan-tagged \
     comment="Downlink to CRS328"
-add bridge=bridge-core interface=sfp3 \
+add bridge=bridge-core interface=sfp-sfpplus4 \
     frame-types=admit-only-vlan-tagged \
     comment="Reserved trunk"
-add bridge=bridge-core interface=sfp4 \
+add bridge=bridge-core interface=sfp-sfpplus5 \
     frame-types=admit-only-vlan-tagged \
     comment="Reserved trunk"
-add bridge=bridge-core interface=sfp5 \
+add bridge=bridge-core interface=sfp-sfpplus6 \
     frame-types=admit-only-vlan-tagged \
     comment="Reserved trunk"
-add bridge=bridge-core interface=sfp6 \
+add bridge=bridge-core interface=sfp-sfpplus7 \
     frame-types=admit-only-vlan-tagged \
     comment="Reserved trunk"
-add bridge=bridge-core interface=sfp7 \
+add bridge=bridge-core interface=sfp-sfpplus8 \
     frame-types=admit-only-vlan-tagged \
     comment="Reserved trunk"
-add bridge=bridge-core interface=sfp8 \
+add bridge=bridge-core interface=sfp-sfpplus9 \
     frame-types=admit-only-vlan-tagged \
     comment="Reserved trunk"
-add bridge=bridge-core interface=sfp9 \
+add bridge=bridge-core interface=sfp-sfpplus10 \
     frame-types=admit-only-vlan-tagged \
     comment="Reserved trunk"
-add bridge=bridge-core interface=sfp10 \
+add bridge=bridge-core interface=sfp-sfpplus11 \
     frame-types=admit-only-vlan-tagged \
     comment="Reserved trunk"
-add bridge=bridge-core interface=sfp11 \
+add bridge=bridge-core interface=sfp-sfpplus12 \
     frame-types=admit-only-vlan-tagged \
     comment="Reserved trunk"
-add bridge=bridge-core interface=sfp12 \
+add bridge=bridge-core interface=sfp-sfpplus13 \
     frame-types=admit-only-vlan-tagged \
     comment="Reserved trunk"
-add bridge=bridge-core interface=sfp-sfpplus2 \
+add bridge=bridge-core interface=sfp-sfpplus14 \
     frame-types=admit-only-vlan-tagged \
     comment="Reserved trunk"
 
 # ============================================================
 # STEP 3: BRIDGE VLAN TABLE
 # CPU port (bridge-core) tagged on VLAN 10 only for management
-# All other VLANs pass through without CPU involvement
 # ============================================================
 /interface bridge vlan
 add bridge=bridge-core vlan-ids=10 \
-    tagged=bridge-core,sfp-sfpplus1,sfp1,sfp2,sfp3,sfp4,sfp5,sfp6,sfp7,sfp8,sfp9,sfp10,sfp11,sfp12,sfp-sfpplus2
+    tagged=bridge-core,sfp-sfpplus1,sfp-sfpplus2,sfp-sfpplus3,sfp-sfpplus4,sfp-sfpplus5,sfp-sfpplus6,sfp-sfpplus7,sfp-sfpplus8,sfp-sfpplus9,sfp-sfpplus10,sfp-sfpplus11,sfp-sfpplus12,sfp-sfpplus13,sfp-sfpplus14
 add bridge=bridge-core vlan-ids=20 \
-    tagged=sfp-sfpplus1,sfp1,sfp2,sfp3,sfp4,sfp5,sfp6,sfp7,sfp8,sfp9,sfp10,sfp11,sfp12,sfp-sfpplus2
+    tagged=sfp-sfpplus1,sfp-sfpplus2,sfp-sfpplus3,sfp-sfpplus4,sfp-sfpplus5,sfp-sfpplus6,sfp-sfpplus7,sfp-sfpplus8,sfp-sfpplus9,sfp-sfpplus10,sfp-sfpplus11,sfp-sfpplus12,sfp-sfpplus13,sfp-sfpplus14
 add bridge=bridge-core vlan-ids=30 \
-    tagged=sfp-sfpplus1,sfp1,sfp2,sfp3,sfp4,sfp5,sfp6,sfp7,sfp8,sfp9,sfp10,sfp11,sfp12,sfp-sfpplus2
+    tagged=sfp-sfpplus1,sfp-sfpplus2,sfp-sfpplus3,sfp-sfpplus4,sfp-sfpplus5,sfp-sfpplus6,sfp-sfpplus7,sfp-sfpplus8,sfp-sfpplus9,sfp-sfpplus10,sfp-sfpplus11,sfp-sfpplus12,sfp-sfpplus13,sfp-sfpplus14
 add bridge=bridge-core vlan-ids=40 \
-    tagged=sfp-sfpplus1,sfp1,sfp2,sfp3,sfp4,sfp5,sfp6,sfp7,sfp8,sfp9,sfp10,sfp11,sfp12,sfp-sfpplus2
+    tagged=sfp-sfpplus1,sfp-sfpplus2,sfp-sfpplus3,sfp-sfpplus4,sfp-sfpplus5,sfp-sfpplus6,sfp-sfpplus7,sfp-sfpplus8,sfp-sfpplus9,sfp-sfpplus10,sfp-sfpplus11,sfp-sfpplus12,sfp-sfpplus13,sfp-sfpplus14
 add bridge=bridge-core vlan-ids=50 \
-    tagged=sfp-sfpplus1,sfp1,sfp2,sfp3,sfp4,sfp5,sfp6,sfp7,sfp8,sfp9,sfp10,sfp11,sfp12,sfp-sfpplus2
+    tagged=sfp-sfpplus1,sfp-sfpplus2,sfp-sfpplus3,sfp-sfpplus4,sfp-sfpplus5,sfp-sfpplus6,sfp-sfpplus7,sfp-sfpplus8,sfp-sfpplus9,sfp-sfpplus10,sfp-sfpplus11,sfp-sfpplus12,sfp-sfpplus13,sfp-sfpplus14
 add bridge=bridge-core vlan-ids=60 \
-    tagged=sfp-sfpplus1,sfp1,sfp2,sfp3,sfp4,sfp5,sfp6,sfp7,sfp8,sfp9,sfp10,sfp11,sfp12,sfp-sfpplus2
+    tagged=sfp-sfpplus1,sfp-sfpplus2,sfp-sfpplus3,sfp-sfpplus4,sfp-sfpplus5,sfp-sfpplus6,sfp-sfpplus7,sfp-sfpplus8,sfp-sfpplus9,sfp-sfpplus10,sfp-sfpplus11,sfp-sfpplus12,sfp-sfpplus13,sfp-sfpplus14
 add bridge=bridge-core vlan-ids=70 \
-    tagged=sfp-sfpplus1,sfp1,sfp2,sfp3,sfp4,sfp5,sfp6,sfp7,sfp8,sfp9,sfp10,sfp11,sfp12,sfp-sfpplus2
+    tagged=sfp-sfpplus1,sfp-sfpplus2,sfp-sfpplus3,sfp-sfpplus4,sfp-sfpplus5,sfp-sfpplus6,sfp-sfpplus7,sfp-sfpplus8,sfp-sfpplus9,sfp-sfpplus10,sfp-sfpplus11,sfp-sfpplus12,sfp-sfpplus13,sfp-sfpplus14
 
 # ============================================================
 # STEP 4: MANAGEMENT IP (VLAN 10)
