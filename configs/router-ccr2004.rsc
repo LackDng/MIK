@@ -43,7 +43,9 @@
 # STEP 2: BRIDGE + VLAN FILTERING
 # ============================================================
 /interface bridge
-add name=bridge-lan vlan-filtering=yes comment="Main LAN bridge"
+add name=bridge-lan vlan-filtering=yes priority=8192 \
+    igmp-snooping=yes \
+    comment="Main LAN bridge – Secondary Root priority=8192"
 
 /interface bridge port
 add bridge=bridge-lan interface=sfp-sfpplus1 \
