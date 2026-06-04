@@ -19,8 +19,8 @@
 # +----------------+-----------------------------------------------+
 # | Interface      | Role                                          |
 # +----------------+-----------------------------------------------+
-# | sfp-sfpplus2   | WAN PRIMARY – PPPoE to ISP modem              |
-# | ether1         | WAN BACKUP  – PPPoE to ISP modem (failover)   |
+# | sfp-sfpplus2   | WAN PRIMARY – PPPoE Viettel (đường chính)     |
+# | ether1         | WAN BACKUP  – PPPoE dự phòng (failover)        |
 # | sfp-sfpplus1   | Trunk to Core CRS326 (S+31DLC10D 10G SMF)    |
 # | ether2         | VLAN 10 ACCESS – Management (direct PC access)|
 # | ether3-ether10 | Reserved (not used)                           |
@@ -114,10 +114,10 @@ add address=192.168.0.1/24  interface=bridge-lan.60 comment="VLAN60 Office+WiFi 
 add address=192.168.5.1/24  interface=bridge-lan.70 comment="VLAN70 CCTV GW"
 
 # ============================================================
-# STEP 5: PPPOE WAN – PRIMARY + BACKUP FAILOVER
-# Primary  : sfp-sfpplus2 (distance=1) – kết nối modem ISP chính
-# Backup   : ether1       (distance=2) – tự động lên khi primary down
-# RouterOS xóa route distance=1 khi pppoe-wan down → traffic chuyển
+# STEP 5: PPPOE WAN – PRIMARY (VIETTEL) + BACKUP FAILOVER
+# Primary  : sfp-sfpplus2 (distance=1) – đường Viettel chính (ưu tiên)
+# Backup   : ether1       (distance=2) – đường dự phòng, tự động lên khi primary down
+# RouterOS xóa route distance=1 khi pppoe-wan (Viettel) down → traffic chuyển
 # sang pppoe-backup (distance=2) tự động, không cần script thêm.
 # ============================================================
 /interface pppoe-client
@@ -125,12 +125,12 @@ add interface=sfp-sfpplus2 name=pppoe-wan \
     user=abcd password="abcd88qưe" \
     add-default-route=yes default-route-distance=1 \
     use-peer-dns=no disabled=no \
-    comment="WAN PRIMARY PPPoE – sfp-sfpplus2"
+    comment="WAN PRIMARY PPPoE Viettel – sfp-sfpplus2 (đường chính)"
 add interface=ether1 name=pppoe-backup \
     user=abcd password="abcd88qưe" \
     add-default-route=yes default-route-distance=2 \
     use-peer-dns=no disabled=no \
-    comment="WAN BACKUP PPPoE – ether1 (failover)"
+    comment="WAN BACKUP PPPoE – ether1 (đường dự phòng, failover)"
 
 # ============================================================
 # STEP 6: DNS

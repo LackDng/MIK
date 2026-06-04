@@ -65,8 +65,8 @@ Management access: Winbox (8291) + SSH (22) allowed from VLAN10 (192.168.10.0/24
 
 | Interface      | Role                                           |
 |----------------|------------------------------------------------|
-| sfp-sfpplus2   | WAN PRIMARY – PPPoE (pppoe-wan, distance=1)    |
-| ether1         | WAN BACKUP – PPPoE (pppoe-backup, distance=2)  |
+| sfp-sfpplus2   | WAN PRIMARY – PPPoE Viettel (pppoe-wan, distance=1) |
+| ether1         | WAN BACKUP – PPPoE dự phòng (pppoe-backup, distance=2) |
 | sfp-sfpplus1   | Trunk → Core CRS326 (S+31DLC10D 10G SMF)      |
 | ether2         | VLAN10 ACCESS – Management (direct PC)         |
 | ether3–ether10 | Reserved (not used)                            |
@@ -99,8 +99,8 @@ Setting CRS326 as Root Bridge prevents CSS610 (which had the lowest MAC address)
 
 ## WAN Failover
 
-- PRIMARY: sfp-sfpplus2 → pppoe-wan (default-route-distance=1)
-- BACKUP: ether1 → pppoe-backup (default-route-distance=2)
+- PRIMARY: sfp-sfpplus2 → pppoe-wan — **Viettel (đường chính, ưu tiên)** (default-route-distance=1)
+- BACKUP: ether1 → pppoe-backup — đường dự phòng (default-route-distance=2)
 - Automatic failover: RouterOS removes distance=1 route when pppoe-wan drops, traffic switches to pppoe-backup automatically.
 - Both PPPoE clients in interface list `WAN`.
 - All firewall/NAT rules use `in-interface-list=WAN` / `out-interface-list=WAN` (not hardcoded to a single interface).
