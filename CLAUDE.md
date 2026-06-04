@@ -15,6 +15,7 @@ Internet (ISP)
 ┌────┴──────────────────────────────┤
 │  CCR2004-16G-2S+                  │
 │  (Router – Layer 3)               │
+│  bridge priority=8192             │
 └────┬──────────────────────────────┘
      │ sfp-sfpplus1
      │ S+31DLC10D (10G SMF)
@@ -22,15 +23,18 @@ Internet (ISP)
 ┌────┴──────────────────┐
 │  CRS326-24S+2Q+RM     │
 │  (Core Switch – L2)   │
+│  bridge priority=4096  │  ← RSTP Root Bridge
 └────┬──────────┬────────┘
-     │ sfp1     │ sfp2
-     │ 1G SMF   │ 1G SMF
+     │ sfp-sfpplus2  │ sfp-sfpplus3
+     │ 1G SMF        │ 1G SMF
 ┌────┴──────┐  ┌┴──────────────────┐
 │  CSS610   │  │  CRS328-24P-4S+   │
 │ (SwOS-L2) │  │  (RouterOS – L2)  │
 └───────────┘  └───────────────────┘
 
-CCR2004 ether11–16 (copper) → Camera/NVR [VLAN 70 access]
+CCR2004 ether11–14 (copper) → Camera/NVR [VLAN 70 access]
+CCR2004 ether15     → NVR-1 (single device, no loop)
+CCR2004 ether16     → Camera switch (NVR + cameras only, no uplink to CRS326)
 ```
 
 ## VLAN Plan
@@ -68,6 +72,31 @@ Management access: Winbox (8291) + SSH (22) allowed from VLAN10 (192.168.10.0/24
 | ether3–ether10 | Reserved (not used)                            |
 | ether11–ether16| VLAN70 ACCESS – Camera/NVR (pvid=70, untagged) |
 
+**Note on ether15/16**: ether15 connects to a single NVR (no downstream switch). ether16 connects to a dedicated camera switch that does NOT uplink back to CRS326. No physical loop exists on these ports.
+
+## CRS326 Port Mapping
+
+| Interface          | Role                                              |
+|--------------------|---------------------------------------------------|
+| sfp-sfpplus1       | Uplink → CCR2004 (S+31DLC10D 10G SMF)            |
+| sfp-sfpplus2       | Downlink → CSS610 (S-31DLC20D 1G SMF)            |
+| sfp-sfpplus3       | Downlink → CRS328 (S-31DLC20D 1G SMF)            |
+| sfp-sfpplus4–13    | In use – trunk all VLANs                          |
+| sfp-sfpplus14–24   | Reserved (not configured)                         |
+
+All 13 active ports (sfp-sfpplus1–13) are trunk ports (admit-only-vlan-tagged), carrying all 6 VLANs.
+
+## STP / RSTP Bridge Priority
+
+| Device  | Bridge Priority | Role                  |
+|---------|-----------------|-----------------------|
+| CRS326  | 4096            | RSTP Root Bridge      |
+| CCR2004 | 8192            | Secondary Root        |
+| CRS328  | 32768 (default) | Non-root              |
+| CSS610  | N/A (SwOS)      | STP disabled          |
+
+Setting CRS326 as Root Bridge prevents CSS610 (which had the lowest MAC address) from winning the RSTP election and causing TCN broadcast storms. Both CRS326 and CCR2004 have `igmp-snooping=yes` on their bridge to reduce multicast flooding (IPTV/camera traffic).
+
 ## WAN Failover
 
 - PRIMARY: sfp-sfpplus2 → pppoe-wan (default-route-distance=1)
@@ -82,6 +111,15 @@ Management access: Winbox (8291) + SSH (22) allowed from VLAN10 (192.168.10.0/24
 - Server IP: 10.10.10.1/24
 - Peer vanhau: 10.10.10.2/32, persistent-keepalive=25
 - Split tunnel: routes 10.10.10.0/24, 192.168.10.0/24, 192.168.0.0/24, 192.168.5.0/24
+- **Note**: WireGuard peer public key must be set manually (`/interface wireguard peers set 0 public-key="<KEY>"`). The peer add command in router-ccr2004.rsc has the public-key commented out to avoid import failure.
+
+## WiFi / AP (Unifi)
+
+- AP brand: Unifi (U7 LR and similar)
+- AP management VLAN: **VLAN 60** (192.168.0.0/24) — controller and APs on same L2 segment, no inter-VLAN routing needed for management
+- Guest WiFi SSID → VLAN 20 (tagged on trunk ports to APs)
+- Office WiFi SSID → VLAN 60 (untagged/native on access port to AP)
+- Recommended channel widths: 40 MHz for 2.4 GHz, 80 MHz for 5 GHz
 
 ## CCTV (VLAN 70)
 
@@ -116,6 +154,12 @@ Guest simple queue: 50M/50M hard cap.
 | configs/switch-access-crs328.rsc  | CRS328          | RouterOS |
 | configs/css610-swos.txt           | CSS610          | SwOS     |
 
+**Security note**: `configs/router-ccr2004.rsc` and `mik.txt` contain real PPPoE credentials. Do NOT commit additional credentials — use placeholders in any new config.
+
+## Git Branch
+
+Active development branch: `claude/config-file-setup-E6YE9`
+
 ## Key Design Decisions
 
 1. **VLAN60 dual role**: Office PCs + AP WiFi management on same subnet (192.168.0.0/24). APs get DHCP from this range; office staff on same VLAN can access AP management web UI directly.
@@ -123,3 +167,6 @@ Guest simple queue: 50M/50M hard cap.
 3. **No VLAN30**: Previously separate "Manage Wifi" VLAN merged into VLAN60 to simplify topology.
 4. **Dual PPPoE failover**: No external keepalive scripts needed — RouterOS native routing distance handles automatic failover.
 5. **Hairpin NAT Option A** (enabled by default): Internal hosts access NVR via direct LAN IP, no WAN IP loop. Option B (hairpin via WAN IP) is in config as commented-out disabled rules.
+6. **CRS326 as RSTP Root Bridge** (priority=4096): Prevents CSS610 (lowest MAC) from winning root election and causing TCN broadcast storms on every link-state change.
+7. **IGMP snooping** on CRS326 and CCR2004 bridges: Reduces multicast flooding to only ports with active IGMP listeners (important for IPTV and camera streams).
+8. **QoS duplicated for both WAN interfaces**: Mangle marks and queue trees are replicated for pppoe-wan and pppoe-backup so QoS remains active during failover.
