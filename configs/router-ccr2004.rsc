@@ -536,15 +536,16 @@ add chain=forward action=accept \
     src-address=192.168.10.0/24 dst-address=192.168.5.0/24 \
     comment="R20 VLAN10 admin full access to CCTV"
 
-# R21: LOCAL_NETS → NVR-1:8054 (Hairpin A – ENABLED)
+# R21: LOCAL_NETS → NVR-1:8054 (Hairpin A + B – ENABLED)
+# Dùng cho cả Option A (direct LAN IP) và Option B (sau DSTNAT Hairpin-B)
 add chain=forward action=accept protocol=tcp \
     src-address-list=LOCAL_NETS dst-address=192.168.5.254 dst-port=8054 \
-    comment="R21 LOCAL_NETS NVR-1:8054 [Hairpin A – ENABLED]"
+    comment="R21 LOCAL_NETS NVR-1:8054 [Hairpin A+B]"
 
-# R22: LOCAL_NETS → NVR-2:8053 (Hairpin A – ENABLED)
+# R22: LOCAL_NETS → NVR-2:8053 (Hairpin A + B – ENABLED)
 add chain=forward action=accept protocol=tcp \
     src-address-list=LOCAL_NETS dst-address=192.168.5.253 dst-port=8053 \
-    comment="R22 LOCAL_NETS NVR-2:8053 [Hairpin A – ENABLED]"
+    comment="R22 LOCAL_NETS NVR-2:8053 [Hairpin A+B]"
 
 # R23: Default deny FORWARD
 add chain=forward action=drop \
@@ -552,10 +553,15 @@ add chain=forward action=drop \
     comment="R23 Default deny FORWARD"
 
 # ============================================================
-# STEP 14: NAT – DST-NAT (Port Forwarding)
+# STEP 14: NAT – DST-NAT (Port Forwarding + Hairpin)
+#
+# Option A (R21/R22 FORWARD): LAN → NVR LAN IP trực tiếp (không cần NAT)
+# Option B (bên dưới): LAN → IP public → redirect về NVR LAN IP
+#   → Dùng khi client dùng IP public (VD: 117.2.11.52:8054) từ nội bộ
 # ============================================================
 /ip firewall nat
 
+# WAN Port Forwarding (internet → NVR)
 add chain=dstnat action=dst-nat \
     in-interface-list=WAN protocol=tcp dst-port=8054 \
     to-addresses=192.168.5.254 to-ports=8054 \
@@ -566,15 +572,18 @@ add chain=dstnat action=dst-nat \
     to-addresses=192.168.5.253 to-ports=8053 \
     comment="DSTNAT WAN:8053 to NVR-2"
 
-# ---- Hairpin Option B DST-NAT (DISABLED) ----
-# add chain=dstnat action=dst-nat disabled=yes \
-#     src-address-list=LOCAL_NETS protocol=tcp dst-port=8054 \
-#     to-addresses=192.168.5.254 to-ports=8054 \
-#     comment="DSTNAT Hairpin-B NVR-1 [DISABLED]"
-# add chain=dstnat action=dst-nat disabled=yes \
-#     src-address-list=LOCAL_NETS protocol=tcp dst-port=8053 \
-#     to-addresses=192.168.5.253 to-ports=8053 \
-#     comment="DSTNAT Hairpin-B NVR-2 [DISABLED]"
+# Hairpin Option B – LAN truy cập NVR qua IP public (ENABLED)
+# Bắt gói tin từ LOCAL_NETS đến port 8054/8053 (dù dst-address là IP public nào)
+# và redirect về IP LAN của NVR. Không cần hardcode IP public (dynamic-safe).
+add chain=dstnat action=dst-nat \
+    src-address-list=LOCAL_NETS protocol=tcp dst-port=8054 \
+    to-addresses=192.168.5.254 to-ports=8054 \
+    comment="DSTNAT Hairpin-B NVR-1 (LAN → public IP → NVR, ENABLED)"
+
+add chain=dstnat action=dst-nat \
+    src-address-list=LOCAL_NETS protocol=tcp dst-port=8053 \
+    to-addresses=192.168.5.253 to-ports=8053 \
+    comment="DSTNAT Hairpin-B NVR-2 (LAN → public IP → NVR, ENABLED)"
 
 # ============================================================
 # STEP 15: NAT – SRC-NAT (Masquerade)
@@ -584,13 +593,17 @@ add chain=srcnat action=masquerade \
     out-interface-list=WAN \
     comment="SRCNAT Masquerade to WAN"
 
-# ---- Hairpin Option B SRC-NAT (DISABLED) ----
-# add chain=srcnat action=masquerade disabled=yes \
-#     src-address-list=LOCAL_NETS dst-address=192.168.5.254 \
-#     comment="SRCNAT Hairpin-B NVR-1 [DISABLED]"
-# add chain=srcnat action=masquerade disabled=yes \
-#     src-address-list=LOCAL_NETS dst-address=192.168.5.253 \
-#     comment="SRCNAT Hairpin-B NVR-2 [DISABLED]"
+# Hairpin Option B SRC-NAT – masquerade để NVR reply về router (ENABLED)
+# Sau DSTNAT, NVR nhận gói src=192.168.0.x → reply về 192.168.0.x qua GW.
+# Masquerade đổi src→192.168.5.1 (router VLAN70 IP) đảm bảo NVR luôn
+# reply về router → router conntrack restore lại địa chỉ gốc cho client.
+add chain=srcnat action=masquerade \
+    src-address-list=LOCAL_NETS dst-address=192.168.5.254 \
+    comment="SRCNAT Hairpin-B NVR-1 (ENABLED)"
+
+add chain=srcnat action=masquerade \
+    src-address-list=LOCAL_NETS dst-address=192.168.5.253 \
+    comment="SRCNAT Hairpin-B NVR-2 (ENABLED)"
 
 # ============================================================
 # STEP 16: QoS – MANGLE

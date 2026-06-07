@@ -166,7 +166,7 @@ Active development branch: `claude/config-file-setup-E6YE9`
 2. **VLAN60 admin access**: Full Winbox/SSH access to all RouterOS devices (same as VLAN10 management).
 3. **No VLAN30**: Previously separate "Manage Wifi" VLAN merged into VLAN60 to simplify topology.
 4. **Dual PPPoE failover**: No external keepalive scripts needed — RouterOS native routing distance handles automatic failover.
-5. **Hairpin NAT Option A** (enabled by default): Internal hosts access NVR via direct LAN IP, no WAN IP loop. Option B (hairpin via WAN IP) is in config as commented-out disabled rules.
+5. **Hairpin NAT Option A + B** (both enabled): Option A = access NVR via direct LAN IP (192.168.5.254:8054). Option B = access NVR via public IP (e.g. 117.2.11.52:8054) from inside LAN — DSTNAT intercepts LOCAL_NETS→port 8054/8053 and redirects to NVR LAN IP; SRCNAT masquerades so NVR replies via router. No hardcoded public IP (dynamic PPPoE safe).
 6. **CRS326 as RSTP Root Bridge** (priority=4096): Prevents CSS610 (lowest MAC) from winning root election and causing TCN broadcast storms on every link-state change.
 7. **IGMP snooping** on CRS326 and CCR2004 bridges: Reduces multicast flooding to only ports with active IGMP listeners (important for IPTV and camera streams).
 8. **QoS duplicated for both WAN interfaces**: Mangle marks and queue trees are replicated for pppoe-wan and pppoe-backup so QoS remains active during failover.
