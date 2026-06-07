@@ -100,10 +100,23 @@ Setting CRS326 as Root Bridge prevents CSS610 (which had the lowest MAC address)
 ## WAN Failover
 
 - PRIMARY: sfp-sfpplus2 → pppoe-wan — **Viettel (đường chính, ưu tiên)** (default-route-distance=1)
-- BACKUP: ether1 → pppoe-backup — đường dự phòng (default-route-distance=2)
+- BACKUP: ether1 → pppoe-backup — **VNPT đường dự phòng** (default-route-distance=2)
 - Automatic failover: RouterOS removes distance=1 route when pppoe-wan drops, traffic switches to pppoe-backup automatically.
 - Both PPPoE clients in interface list `WAN`.
 - All firewall/NAT rules use `in-interface-list=WAN` / `out-interface-list=WAN` (not hardcoded to a single interface).
+
+### WAN Monitoring Script (STEP 21)
+
+| Component | Chi tiết |
+|-----------|---------|
+| Routing table | `wan-check-viettel` – route 8.8.8.8/32 qua pppoe-wan |
+| Netwatch | Ping 8.8.8.8 mỗi 30s qua table Viettel, timeout 5s |
+| `wan-viettel-down` | Disable pppoe-wan → VNPT backup tự động active (distance=2) |
+| `wan-viettel-up` | Enable pppoe-wan → Viettel primary active lại (distance=1) |
+| `wan-viettel-recovery` | Script chạy mỗi 5 phút, thử re-enable pppoe-wan khi đang failover |
+| Scheduler | `viettel-recovery-check` interval=5m – trigger recovery script |
+
+**Tại sao cần scheduler recovery**: Khi pppoe-wan bị disable, route `wan-check-viettel` biến mất → netwatch không thể tự phát hiện Viettel đã phục hồi. Scheduler định kỳ thử enable lại, sau 20s kiểm tra nếu kết nối OK thì giữ lại, nếu không thì disable tiếp.
 
 ## WireGuard VPN
 

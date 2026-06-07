@@ -698,7 +698,90 @@ add name=weekly-backup interval=7d start-time=02:00:00 \
     comment="Weekly config backup to router flash"
 
 # ============================================================
-# STEP 21: USER ACCOUNT HARDENING
+# STEP 21: WAN FAILOVER – AUTO-MONITORING VIETTEL → VNPT
+#
+# Cơ chế hoạt động:
+#   1. Tạo routing table riêng "wan-check-viettel" + route 8.8.8.8 qua pppoe-wan
+#      → netwatch ping 8.8.8.8 riêng qua đường Viettel, không bị ảnh hưởng bởi backup
+#   2. Viettel DOWN (PPPoE rớt hoặc mất internet):
+#        → down-script: disable pppoe-wan
+#        → RouterOS tự dùng route distance=2 (pppoe-backup VNPT) ngay lập tức
+#   3. Recovery: scheduler chạy mỗi 5 phút, thử re-enable pppoe-wan
+#        → Nếu reconnect OK → netwatch up-script → Viettel primary (distance=1) active lại
+#   4. Thời gian phát hiện sự cố: ≤30 giây (interval netwatch)
+#
+# LƯU Ý: Sau khi import, nhập scripts thủ công qua Winbox Terminal
+#          hoặc SSH nếu source= multiline không import được tự động.
+# ============================================================
+
+# Routing table riêng để kiểm tra internet qua Viettel độc lập
+/routing table
+add name=wan-check-viettel fib \
+    comment="Routing table Viettel health check – dùng bởi netwatch"
+
+# Route 8.8.8.8 chỉ đi qua pppoe-wan (Viettel)
+# Route này tự động mất khi pppoe-wan down → netwatch phát hiện ngay
+/ip route
+add dst-address=8.8.8.8/32 gateway=pppoe-wan \
+    routing-table=wan-check-viettel scope=10 \
+    comment="Viettel health check route – active khi pppoe-wan UP"
+
+# ---- SCRIPTS ----
+# Script 1: Kích hoạt khi Viettel DOWN (netwatch down-script)
+/system script
+add name=wan-viettel-down \
+    policy=read,write,policy,test \
+    comment="WAN failover: disable Viettel khi mất internet, VNPT backup active" \
+    source=":log warning \"WAN-FAILOVER: Viettel DOWN - disabling pppoe-wan, switching to VNPT backup\"\n/interface pppoe-client disable [find name=pppoe-wan]"
+
+# Script 2: Kích hoạt khi Viettel UP trở lại (netwatch up-script)
+add name=wan-viettel-up \
+    policy=read,write,policy,test \
+    comment="WAN restore: enable Viettel khi phục hồi, Viettel primary active lại" \
+    source=":log warning \"WAN-FAILOVER: Viettel UP - enabling pppoe-wan, reverting to Viettel as primary\"\n/interface pppoe-client enable [find name=pppoe-wan]"
+
+# Script 3: Thử phục hồi Viettel định kỳ (dùng bởi scheduler bên dưới)
+# Logic: nếu pppoe-wan đang disabled → enable → chờ 20s → kiểm tra running
+#        Nếu vẫn không connect → disable lại → thử lại sau 5 phút
+add name=wan-viettel-recovery \
+    policy=read,write,policy,test \
+    comment="Thử re-enable pppoe-wan mỗi 5 phút khi đang failover sang VNPT" \
+    source={
+:local disabled [/interface pppoe-client get [find name=pppoe-wan] disabled]
+:if ($disabled = true) do={
+    :log info "WAN-RECOVERY: pppoe-wan disabled, testing Viettel reconnect..."
+    /interface pppoe-client enable [find name=pppoe-wan]
+    :delay 20s
+    :local running [/interface pppoe-client get [find name=pppoe-wan] running]
+    :if ($running = false) do={
+        :log info "WAN-RECOVERY: Viettel still unreachable, disabling pppoe-wan again"
+        /interface pppoe-client disable [find name=pppoe-wan]
+    } else={
+        :log warning "WAN-RECOVERY: Viettel reconnected OK, netwatch will confirm and activate primary"
+    }
+}
+}
+
+# ---- NETWATCH ----
+# Ping 8.8.8.8 qua wan-check-viettel mỗi 30s, timeout 5s
+# → down-script khi fail, up-script khi recover
+/tool netwatch
+add host=8.8.8.8 interval=30s timeout=5s \
+    routing-table=wan-check-viettel \
+    up-script="/system script run wan-viettel-up" \
+    down-script="/system script run wan-viettel-down" \
+    comment="Monitor Viettel – ping 8.8.8.8 via wan-check-viettel routing table"
+
+# ---- SCHEDULER ----
+# Scheduler thử phục hồi Viettel mỗi 5 phút
+# (Xử lý trường hợp pppoe-wan đang disabled → netwatch không thể tự detect recovery)
+/system scheduler
+add name=viettel-recovery-check interval=5m start-time=startup \
+    on-event="/system script run wan-viettel-recovery" \
+    comment="Periodic Viettel recovery attempt while in VNPT failover mode"
+
+# ============================================================
+# STEP 22: USER ACCOUNT HARDENING
 # !! Bắt buộc thực hiện THỦ CÔNG trước khi đưa vào production !!
 # ============================================================
 # /user add name=<TEN_ADMIN_MOI> password="<MAT_KHAU_MANH>" group=full
