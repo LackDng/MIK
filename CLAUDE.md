@@ -197,6 +197,14 @@ Hệ thống thực tế có **3 switch CRS328** (không phải 1 như thiết k
 
 Admin user chung: `Theindochine`. File delta để đồng bộ từng thiết bị: `configs/delta/delta-*.rsc` (paste Terminal, không import).
 
+### Lưu ý khi paste lệnh vào Winbox Terminal
+
+| Vấn đề | Cách xử lý |
+|--------|-----------|
+| Comment gốc chứa dấu gạch dài `–` không paste được → `find comment="..."` trả rỗng → `no such item` | Dùng `find comment~"chuỗi con"` (toán tử `~`) thay cho `=` |
+| Nối dòng bằng `\` hay bị đứt, dòng sau chạy riêng thành lệnh lỗi | Viết lệnh trên **1 dòng duy nhất** |
+| `[find a="x" and b=y]` | RouterOS dùng khoảng trắng làm AND: `[find a="x" b=y]` |
+
 ## Config Files
 
 | File                              | Device          | System   |

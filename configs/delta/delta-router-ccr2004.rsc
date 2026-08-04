@@ -94,8 +94,7 @@ add host=8.8.4.4 interval=30s timeout=5s \
 #    Kết quả: KHÔNG có rule trùng. Rule #2 là port-forward SQL 1433
 #    bị dán nhầm comment của NVR-2 → chỉ cần sửa comment.
 # ------------------------------------------------------------
-/ip firewall nat set [find comment="DSTNAT WAN:8053 to NVR-2" and dst-port=1433] \
-    comment="DSTNAT WAN:1433 to SQL 192.168.0.254 [RUI RO - nen dung VPN]"
+/ip firewall nat set [find chain=dstnat dst-port=1433] comment="DSTNAT WAN:1433 to SQL 192.168.0.254 [RUI RO - nen dung VPN]"
 
 # QUYẾT ĐỊNH THIẾT KẾ (user xác nhận 04/08/2026):
 #   Giữ nguyên in-interface=pppoe-wan cho TẤT CẢ rule DSTNAT.

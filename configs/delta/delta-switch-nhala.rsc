@@ -17,11 +17,14 @@
 # ------------------------------------------------------------
 # 2. INPUT: thêm quyền quản trị từ VLAN60
 #    (chèn trước rule Whitelist VPN)
+#
+# LƯU Ý: comment gốc trên thiết bị chứa dấu gạch ngang dài "–" thường
+#        KHÔNG copy/paste được → find so khớp CHÍNH XÁC sẽ trả về rỗng
+#        và place-before báo "no such item".
+#        → Dùng "~" (so khớp chuỗi con) thay cho "=".
+#        → Viết 1 dòng, tránh nối dòng bằng "\" trong Winbox Terminal.
 # ------------------------------------------------------------
-/ip firewall filter
-add chain=input action=accept src-address=192.168.0.0/24 \
-    comment="Whitelist VLAN60 Office" \
-    place-before=[find comment="Whitelist VPN – bypass brute-force check"]
+/ip firewall filter add chain=input action=accept src-address=192.168.0.0/24 comment="Whitelist VLAN60 Office" place-before=[find comment~"Whitelist VPN"]
 
 # ------------------------------------------------------------
 # 3. /ip service: cho phép VLAN60

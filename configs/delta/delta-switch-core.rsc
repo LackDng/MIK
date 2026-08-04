@@ -20,11 +20,11 @@
 # ------------------------------------------------------------
 # 2. INPUT: thêm quyền quản trị từ VLAN60
 #    (chèn trước rule Whitelist VPN)
+#
+# LƯU Ý: comment gốc chứa dấu "–" thường không paste được → dùng "~"
+#        (so khớp chuỗi con) thay cho "=", viết 1 dòng.
 # ------------------------------------------------------------
-/ip firewall filter
-add chain=input action=accept src-address=192.168.0.0/24 \
-    comment="Whitelist VLAN60 Office" \
-    place-before=[find comment="Whitelist VPN – bypass brute-force check"]
+/ip firewall filter add chain=input action=accept src-address=192.168.0.0/24 comment="Whitelist VLAN60 Office" place-before=[find comment~"Whitelist VPN"]
 
 # ------------------------------------------------------------
 # 3. DỌN RULE TRÙNG LẶP (backup có 2 cặp Whitelist VLAN10/VPN)
