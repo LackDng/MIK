@@ -165,14 +165,30 @@ Queue tree on pppoe-wan (PRIMARY) and pppoe-backup (BACKUP):
 
 Guest simple queue: 50M/50M hard cap.
 
+## Live Device Fleet (từ backup 04/08/2026)
+
+Hệ thống thực tế có **3 switch CRS328** (không phải 1 như thiết kế ban đầu):
+
+| Identity (thực tế) | Model   | Kết nối từ CORE     | Trạng thái so với thiết kế |
+|--------------------|---------|---------------------|---------------------------|
+| CCR2004-Router     | CCR2004 | —                   | Còn VLAN30, thiếu VLAN60 mgmt, netwatch missing, thiếu QoS backup |
+| CORE               | CRS326  | —                   | Chưa set priority=4096 (CSS610 vẫn là root!), thiếu VLAN60 |
+| IT-ROOM            | CRS328  | sfp-sfpplus2        | Gần khớp; còn user admin mặc định |
+| NHA LA             | CRS328  | sfp-sfpplus5        | Firewall cũ, thiếu VLAN60 |
+| APART              | CRS328  | sfp-sfpplus7        | Firewall cũ, thiếu VLAN60, rule trùng |
+| (11-12 ?)          | ?       | sfp-sfpplus14       | Chưa xác định thiết bị (có thể CSS610) |
+
+Admin user chung: `Theindochine`. File delta để đồng bộ từng thiết bị: `configs/delta/delta-*.rsc` (paste Terminal, không import).
+
 ## Config Files
 
 | File                              | Device          | System   |
 |-----------------------------------|-----------------|----------|
 | configs/router-ccr2004.rsc        | CCR2004         | RouterOS |
-| configs/switch-core-crs326.rsc    | CRS326          | RouterOS |
-| configs/switch-access-crs328.rsc  | CRS328          | RouterOS |
+| configs/switch-core-crs326.rsc    | CRS326 (CORE)   | RouterOS |
+| configs/switch-access-crs328.rsc  | CRS328 (template cho IT-ROOM / NHA LA / APART) | RouterOS |
 | configs/css610-swos.txt           | CSS610          | SwOS     |
+| configs/delta/delta-*.rsc         | Delta commands đồng bộ thiết bị đang chạy | RouterOS Terminal |
 
 **Security note**: `configs/router-ccr2004.rsc` and `mik.txt` contain real PPPoE credentials. Do NOT commit additional credentials — use placeholders in any new config.
 
