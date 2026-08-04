@@ -1,11 +1,41 @@
 # ============================================================
 # BLOCK 4: CSS610-8P-2S+IN – SwOS Configuration Guide
-# SwOS (không phải RouterOS – cấu hình qua Web UI)
+# SwOS (không phải RouterOS – cấu hình qua Web UI, không có CLI)
 # ============================================================
 #
-# VLAN MAPPING TABLE:
+# ÁP DỤNG CHO 10 THIẾT BỊ (xác nhận qua Winbox Neighbors 04/08/2026)
+#
+# +----------------+----------------+-----------+----------+
+# | Identity       | IP quản trị    | MAC       | Firmware |
+# +----------------+----------------+-----------+----------+
+# | Vila 5-6       | 192.168.10.6   | ..C1:F7:7F| SwOS 2.18|
+# | Vila 7-8       | 192.168.10.7   | ..C1:F8:00| SwOS 2.21|
+# | Villa 11-12    | 192.168.10.8   | ..C1:EF:40| SwOS 2.18|
+# | Vila 9-10      | 192.168.10.9   | ..C1:F7:0E| SwOS 2.21|
+# | Vila 3-4       | 192.168.10.10  | ..C1:F7:F4| SwOS 2.18|
+# | Bungalow 7-8   | 192.168.10.11  | ..C5:6C:75| SwOS 2.18|
+# | Bungalow 9-10  | 192.168.10.12  | ..C2:CC:9A| SwOS 2.18|
+# | Bungalow 11-12 | 192.168.10.13  | ..C5:6A:3A| SwOS 2.21|
+# | Bungalow 13-14 | 192.168.10.14  | ..C4:A6:17| SwOS 2.21|
+# | Vila 1-2       | 192.168.10.15  | ..C5:6A:27| SwOS 2.18|
+# +----------------+----------------+-----------+----------+
+# (MAC prefix chung: F4:1E:57:)
+#
+# !! DẢI IP 192.168.10.1–.15 ĐÃ DÙNG HẾT.
+#    Thiết bị mới phải bắt đầu từ 192.168.10.16.
+#    .1 ROUTER | .2 CORE | .3 IT-ROOM | .4 NHA LA | .5 APART
+#
+# !! FIRMWARE KHÔNG ĐỒNG NHẤT: 6 máy SwOS 2.18, 4 máy SwOS 2.21.
+#    Khuyến nghị nâng toàn bộ lên 2.21 (bản cao nhất đang có trong hệ
+#    thống) để hành vi VLAN/IGMP giống nhau giữa các máy.
+#    Nâng cấp: tab System → Upgrade → chọn file .fwf từ mikrotik.com
+#    Làm từng máy một, ngoài giờ, tránh nâng đồng loạt.
+#
+# ============================================================
+# VLAN MAPPING TABLE
+# ============================================================
 # +------+-------------+---------------------------------------+
-# | VLAN | Name        | Port 9 (SFP uplink)                   |
+# | VLAN | Name        | Port 9/10 (SFP uplink)                |
 # +------+-------------+---------------------------------------+
 # |   10 | Management  | T (Tagged)                            |
 # |   20 | Wifi Guest  | T (Tagged)                            |
@@ -14,65 +44,39 @@
 # |   60 | Office+WiFi | T (Tagged)                            |
 # |   70 | CCTV        | T (Tagged)                            |
 # +------+-------------+---------------------------------------+
-# (6 VLANs total – VLAN 30 removed)
+# (6 VLANs – VLAN 30 đã bỏ, gộp vào VLAN 60)
 #
 # PORT MAPPING TABLE:
-# +--------+----------------------------------------------------+
-# | Port   | Role                                               |
-# +--------+----------------------------------------------------+
-# | Port 9 | SFP uplink → Core CRS326 (S-31DLC20D 1G SMF)      |
-# |        | Trunk tagged all VLANs                             |
-# | Port 1–8 | PoE access ports – not configured (reserved)    |
-# +--------+----------------------------------------------------+
+# +----------+--------------------------------------------------+
+# | Port     | Role                                             |
+# +----------+--------------------------------------------------+
+# | Port 9/10| SFP uplink → CORE CRS326, trunk tagged all VLAN  |
+# | Port 1–8 | PoE access – gán VLAN theo nhu cầu từng phòng    |
+# +----------+--------------------------------------------------+
 #
-# ============================================================
-# !! TRẠNG THÁI: CSS610 CHƯA CÓ TRONG MẠNG (xác nhận 04/08/2026)
-# ============================================================
-# `/ip neighbor print` trên CORE chỉ thấy 4 thiết bị RouterOS:
-#   ROUTER (.1), IT-ROOM (.3), NHA LA (.4 – sfp5), APART (.5 – sfp7).
-# Không có thiết bị SwOS nào → CSS610 chưa cắm điện / chưa đấu uplink /
-# chưa triển khai. File này là HƯỚNG DẪN CHO KHI TRIỂN KHAI.
-#
-# !! ĐỔI IP QUẢN TRỊ: 192.168.10.4 → 192.168.10.6
-#    Lý do: .4 ĐANG ĐƯỢC NHA LA (CRS328) SỬ DỤNG. Nếu đặt CSS610 = .4
-#    sẽ gây XUNG ĐỘT IP, mất quản trị NHA LA.
-#    IP đã dùng: .1 ROUTER | .2 CORE | .3 IT-ROOM | .4 NHA LA | .5 APART
-#
-# !! CỔNG UPLINK trên CORE: chọn cổng trunk còn trống khi triển khai.
-#    Cổng đang dùng: sfp1 (→ROUTER), sfp2 (→IT-ROOM), sfp5 (→NHA LA),
-#                    sfp7 (→APART), sfp14 (nhãn "To 11-12", chưa rõ)
-#    Mọi cổng sfp-sfpplus1–13 trên CORE đã cấu hình sẵn trunk all-VLAN
-#    → chỉ cần cắm module + fiber là chạy.
-#
-# MANAGEMENT IP: 192.168.10.6/24 (VLAN10), GW: 192.168.10.1
-# Access: http://192.168.10.6
 # ============================================================
 
 # ============================================================
-# CSS610 – SwOS Web UI Configuration Steps
-# Truy cập: http://192.168.10.6 (VLAN10)
-# ============================================================
-
-# ============================================================
-# Tab: System
+# Tab: System   (thay <IP> bằng IP của máy đang cấu hình)
 # ============================================================
 #
-#   Identity         : CSS610-Access2
-#   IP Address       : 192.168.10.6
+#   Identity         : <tên khu, VD "Vila 5-6">
+#   IP Address       : <IP theo bảng trên>
 #   Subnet Mask      : 255.255.255.0
 #   Default Gateway  : 192.168.10.1
 #   VLAN ID (mgmt)   : 10
-#   Allow From       : 192.168.10.0/24, 192.168.0.0/24  ← VLAN10 và VLAN60
+#   Allow From       : 192.168.10.0/24, 192.168.0.0/24  ← VLAN10 + VLAN60
 #   DNS Server       : 8.8.8.8
-#   IGMP Snooping    : ☑ Enable  ← đồng bộ với CCR2004/CRS326/CRS328
+#   IGMP Snooping    : ☑ Enable  ← đồng bộ với ROUTER/CORE/CRS328
 #                        (giảm multicast flood IPTV/camera)
+#
+# !! KIỂM TRA IP TRƯỚC KHI ĐỔI: nếu gõ nhầm IP trùng máy khác sẽ mất
+# !! quản trị cả 2 máy. Ping thử IP định dùng, phải KHÔNG có phản hồi.
 #
 
 # ============================================================
 # Tab: VLANs
 # ============================================================
-#
-# Cấu hình 6 VLAN (nhập từng VLAN vào bảng):
 #
 #   VLAN ID: 10   Name: Management
 #   VLAN ID: 20   Name: WifiGuest
@@ -86,44 +90,40 @@
 # Tab: VLAN (Port VLAN membership)
 # ============================================================
 #
-# Bảng VLAN membership – chỉ cần cấu hình Port 9 (SFP uplink):
+# Cổng SFP uplink → CORE: đặt T (Tagged) cho cả 6 VLAN
 #
-#   VLAN 10 → cột Port 9: T
-#   VLAN 20 → cột Port 9: T
-#   VLAN 40 → cột Port 9: T
-#   VLAN 50 → cột Port 9: T
-#   VLAN 60 → cột Port 9: T
-#   VLAN 70 → cột Port 9: T
+#   VLAN 10 → T | VLAN 20 → T | VLAN 40 → T
+#   VLAN 50 → T | VLAN 60 → T | VLAN 70 → T
 #
-# Port 1–8: chưa assign VLAN nào (để trống hoặc cấu hình sau)
+# Port 1–8 (access, tuỳ nhu cầu từng khu):
+#   - Camera        → U cho VLAN 70, PVID=70
+#   - IP Phone      → U cho VLAN 50, PVID=50
+#   - TV/IPTV box   → U cho VLAN 40, PVID=40
+#   - AP WiFi khách → PVID=60, U cho VLAN 60 + T cho VLAN 20
+#                     (SSID Office dùng native 60, SSID Guest tag 20)
 #
-# Lưu ý: Với SwOS, "T" = Tagged (trunk), "U" = Untagged (access)
+# Lưu ý SwOS: "T" = Tagged (trunk), "U" = Untagged (access)
 #
 
 # ============================================================
 # Tab: Ports
 # ============================================================
 #
-# Port 9 (SFP):
-#   PVID        : 1    (default, trunk port không cần pvid)
-#   Type        : Trunk
-#   RSTP        : ☑ Enable   ← ĐỔI: trước đây để disabled
+# Cổng SFP uplink:
+#   PVID        : 1    (trunk không cần pvid)
+#   RSTP        : ☑ Enable
 #   Flow Control: disabled
 #
-# Vì sao giờ BẬT được RSTP (trước khuyến nghị tắt):
-#   Sau khi CRS326 (CORE) đặt priority=4096, CORE luôn thắng bầu cử Root
-#   Bridge bất kể MAC. CSS610 không còn khả năng cướp ngôi root → bật RSTP
-#   là an toàn và có thêm lợi ích: chống loop nếu ai đó cắm nhầm 2 port
-#   vào cùng một switch.
-#   → Nếu firmware SwOS không có mục RSTP, để disabled cũng chấp nhận được
-#     (CSS610 chỉ có 1 uplink duy nhất, không có đường dự phòng).
+# Vì sao BẬT RSTP (tài liệu cũ khuyên tắt):
+#   Sau khi CORE đặt priority=4096, CORE luôn thắng bầu cử Root Bridge
+#   bất kể MAC → CSS610 không thể cướp ngôi root nữa. Bật RSTP lúc này
+#   an toàn và có thêm lợi ích: chống loop nếu ai cắm nhầm 2 cổng vào
+#   nhau — rủi ro thực tế cao vì có tới 10 switch đặt rải ở các khu.
+#   → Nếu firmware không có mục RSTP, để disabled vẫn chấp nhận được.
 #
-# Port 1–8 (PoE copper – chưa dùng):
-#   Để mặc định hoặc disable nếu cần bảo mật
-#   !! Khi bắt đầu dùng: PHẢI gán VLAN cho port (tab VLAN + đặt PVID),
-#   !! nếu không thiết bị sẽ nằm ở VLAN 1 và không đi đâu được.
-#   !! Ví dụ cắm AP office: PVID=60, tab VLAN cột port đó chọn U cho VLAN 60
-#   !!                      (nếu AP cần thêm SSID Guest thì VLAN 20 = T)
+# Port 1–8 (PoE copper):
+#   !! Cổng chưa gán VLAN sẽ nằm ở VLAN 1 và không đi đâu được.
+#   !! Phải đặt PVID + gán VLAN ở tab VLAN trước khi cắm thiết bị.
 #
 
 # ============================================================
@@ -131,15 +131,10 @@
 # ============================================================
 #
 # Port 1–8 có PoE (802.3af/at):
-#   - Disable PoE trên port không dùng để tiết kiệm điện
+#   - Disable PoE trên cổng không dùng để tiết kiệm điện
 #   - Enable khi cắm AP WiFi, IP Phone, Camera
-#   - PoE budget tổng: kiểm tra datasheet CSS610-8P-2S+
-#
-
-# ============================================================
-# Tab: Hosts
-# ============================================================
-# (Xem MAC address table – read only, không cần cấu hình)
+#   - Kiểm tra tổng PoE budget của CSS610-8P-2S+ trước khi cắm nhiều
+#     thiết bị công suất cao (AP U7 LR ~20W, camera PTZ có thể >25W)
 #
 
 # ============================================================
@@ -148,10 +143,14 @@
 #
 # 1. SwOS không có CLI – tất cả cấu hình qua Web UI
 # 2. Sau khi cấu hình System tab → Apply → thiết bị reboot
-# 3. Truy cập lại qua http://192.168.10.6 (cần PC trên VLAN10)
-# 4. Backup config: System tab → Backup button → lưu file .swb
-# 5. Module SFP: S-31DLC20D (1G Single-mode) cắm Port 9
+# 3. Truy cập lại qua http://<IP> (cần PC trên VLAN10 hoặc VLAN60)
+# 4. Backup config: System tab → Backup → lưu file .swb
+#    → Đặt tên theo khu, VD "vila-5-6-20260804.swb"
+# 5. Module SFP: S-31DLC20D hoặc tương đương (1G Single-mode)
 #    Cáp: LC-LC Single-mode OS2
+# 6. CSS610 KHÔNG hiện trong `/ip neighbor print` trên CORE (SwOS mặc
+#    định không phát MNDP qua cổng vật lý). Xem qua tab Neighbors của
+#    Winbox trên PC cùng VLAN10. Đây KHÔNG phải lỗi.
 #
 # ============================================================
 # FIRST-TIME SETUP (nếu chưa có VLAN10 access)
@@ -159,6 +158,6 @@
 # 1. Cắm trực tiếp PC vào Port 1 (copper PoE)
 # 2. Set PC IP: 192.168.88.x/24 (SwOS default: 192.168.88.1)
 # 3. Truy cập http://192.168.88.1
-# 4. Cấu hình System tab: IP=192.168.10.6, VLAN=10, GW=192.168.10.1
-# 5. Apply → reboot → cắm Port 9 lên Core CRS326
+# 4. Cấu hình System tab: IP=<IP mới>, VLAN=10, GW=192.168.10.1
+# 5. Apply → reboot → cắm cổng SFP lên CORE CRS326
 # ============================================================

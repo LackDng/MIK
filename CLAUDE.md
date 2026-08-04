@@ -24,21 +24,18 @@ Internet (ISP)
 │  CRS326-24S+2Q+RM  "CORE"         │
 │  (Core Switch – L2) 192.168.10.2  │
 │  bridge priority=4096             │  ← RSTP Root Bridge
-└──┬────────┬────────┬──────────┬───┘
-   │ sfp2   │ sfp5   │ sfp7     │ sfp14
-   │ (?)    │ 1G SMF │ 1G SMF   │ "To 11-12" (?)
-┌──┴─────┐ ┌┴──────┐ ┌┴───────┐
-│IT-ROOM │ │NHA LA │ │ APART  │   ← 3× CRS328-24P-4S+
-│  .10.3 │ │ .10.4 │ │ .10.5  │
-└────────┘ └───────┘ └────────┘
+└─┬──────┬──────┬──────┬────────────┘
+  │ sfp2 │ sfp5 │ sfp7 │ sfp14 … (+ các cổng khác chưa map)
+  │      │      │      │
+┌─┴────┐ ┌┴────┐ ┌┴────┐ ┌┴──────────────┐
+│IT-ROOM│ │NHA LA│ │APART│ │ Villa 11-12   │
+│ .10.3 │ │.10.4 │ │.10.5│ │ CSS610 .10.8  │
+└───────┘ └──────┘ └─────┘ └───────────────┘
+  CRS328    CRS328   CRS328
 
-(?) = chưa xác nhận. `/ip neighbor print` trên CORE chỉ thấy NHA LA
-      (sfp5) và APART (sfp7) là láng giềng vật lý trực tiếp.
-      IT-ROOM chỉ hiện qua vlan10-mgmt (L3) → link sfp2 có thể đang DOWN
-      hoặc IT-ROOM đấu nối qua đường khác. Xem mục "Việc cần xác minh".
-
-CSS610 (SwOS): KHÔNG xuất hiện trong neighbor list → chưa triển khai
-               hoặc chưa cắm điện/uplink.
++ 9 CSS610 khác (Vila 1-2/3-4/5-6/7-8/9-10, Bungalow 7-8/9-10/
+  11-12/13-14) – IP .10.6–.15, cổng CORE chưa map đầy đủ.
+  Tổng: 10× CSS610-8P-2S+ phục vụ các khu villa/bungalow.
 
 CCR2004 ether11–14 (copper) → Camera/NVR [VLAN 70 access]
 CCR2004 ether15     → NVR-1 (single device, no loop)
@@ -60,18 +57,31 @@ CCR2004 ether16     → Camera switch (NVR + cameras only, no uplink to CRS326)
 
 ## Device Management IPs
 
-Xác nhận bằng `/ip neighbor print` trên CORE (04/08/2026):
+Hệ thống thực tế có **15 thiết bị** (không phải 4): 1 router + 1 core + 3 CRS328 + **10 CSS610**.
 
-| Device  | Identity | IP (VLAN10)      | Gateway      |
-|---------|----------|------------------|--------------|
-| CCR2004 | ROUTER   | 192.168.10.1/24  | —            |
-| CRS326  | CORE     | 192.168.10.2/24  | 192.168.10.1 |
-| CRS328  | IT-ROOM  | 192.168.10.3/24  | 192.168.10.1 |
-| CRS328  | NHA LA   | 192.168.10.4/24  | 192.168.10.1 |
-| CRS328  | APART    | 192.168.10.5/24  | 192.168.10.1 |
-| CSS610  | (chưa triển khai) | 192.168.10.6/24 – **đề xuất** | 192.168.10.1 |
+| IP | Identity | Model | Firmware |
+|----|----------|-------|----------|
+| 192.168.10.1 | ROUTER | CCR2004-16G-2S+ | ROS 7.23.3 |
+| 192.168.10.2 | CORE | CRS326-24S+2Q+ | ROS 7.23.3 |
+| 192.168.10.3 | IT-ROOM | CRS328-24P-4S+ | ROS 7.23.3 |
+| 192.168.10.4 | NHA LA | CRS328-24P-4S+ | ROS 7.23.3 |
+| 192.168.10.5 | APART | CRS328-24P-4S+ | ROS 7.23.3 |
+| 192.168.10.6 | Vila 5-6 | CSS610-8P-2S+ | SwOS 2.18 |
+| 192.168.10.7 | Vila 7-8 | CSS610-8P-2S+ | SwOS 2.21 |
+| 192.168.10.8 | Villa 11-12 | CSS610-8P-2S+ | SwOS 2.18 |
+| 192.168.10.9 | Vila 9-10 | CSS610-8P-2S+ | SwOS 2.21 |
+| 192.168.10.10 | Vila 3-4 | CSS610-8P-2S+ | SwOS 2.18 |
+| 192.168.10.11 | Bungalow 7-8 | CSS610-8P-2S+ | SwOS 2.18 |
+| 192.168.10.12 | Bungalow 9-10 | CSS610-8P-2S+ | SwOS 2.18 |
+| 192.168.10.13 | Bungalow 11-12 | CSS610-8P-2S+ | SwOS 2.21 |
+| 192.168.10.14 | Bungalow 13-14 | CSS610-8P-2S+ | SwOS 2.21 |
+| 192.168.10.15 | Vila 1-2 | CSS610-8P-2S+ | SwOS 2.18 |
 
-⚠️ **XUNG ĐỘT IP đã tránh được**: tài liệu cũ ghi CSS610 = 192.168.10.4, nhưng IP đó **đang được NHA LA sử dụng**. Nếu triển khai CSS610 với .4 sẽ gây xung đột IP làm mất quản trị NHA LA. Đã đổi đề xuất sang **192.168.10.6**.
+**Dải .1–.15 ĐÃ DÙNG HẾT. Thiết bị mới bắt đầu từ 192.168.10.16.**
+
+⚠️ **Firmware SwOS không đồng nhất**: 6 máy chạy 2.18, 4 máy chạy 2.21. Nên nâng toàn bộ lên 2.21 để hành vi VLAN/IGMP giống nhau, tránh lỗi khó chẩn đoán.
+
+**Vì sao CSS610 không hiện trong `/ip neighbor print` trên CORE**: SwOS mặc định tắt MNDP discovery, hoặc `discover-interface-list` trên CORE giới hạn. Thấy được qua tab Neighbors của Winbox (dùng broadcast từ PC). Không phải lỗi.
 
 Management access: Winbox (8291) + SSH (22) allowed from VLAN10 (192.168.10.0/24), VLAN60 (192.168.0.0/24), and VPN (10.10.10.0/24).
 
@@ -212,29 +222,30 @@ Guest simple queue: 50M/50M hard cap.
 
 Hệ thống thực tế có **3 switch CRS328** (không phải 1 như thiết kế ban đầu):
 
-Tất cả đang chạy RouterOS **7.23.3 (stable)** – đồng nhất phiên bản.
+RouterOS đồng nhất **7.23.3 (stable)** trên cả 5 thiết bị RouterOS.
 
-| Identity | Model   | IP        | Kết nối từ CORE | Ghi chú |
-|----------|---------|-----------|-----------------|---------|
-| ROUTER   | CCR2004-16G-2S+ | .10.1 | — (uplink sfp1) | Còn VLAN30, thiếu VLAN60 mgmt, thiếu QoS backup |
-| CORE     | CRS326-24S+2Q+ | .10.2 | — | Chưa set priority=4096, thiếu VLAN60 |
-| IT-ROOM  | CRS328-24P-4S+ | .10.3 | **chỉ thấy qua L3** ⚠️ | Còn user `admin` mặc định |
-| NHA LA   | CRS328-24P-4S+ | .10.4 | sfp-sfpplus5 ✅ | Firewall cũ, thiếu VLAN60 |
-| APART    | CRS328-24P-4S+ | .10.5 | sfp-sfpplus7 ✅ | Firewall cũ, thiếu VLAN60, rule trùng |
-| CSS610   | CSS610-8P-2S+ | (chưa có) | **không thấy** ⚠️ | Chưa triển khai |
+| Identity | Model | IP | Cổng CORE | Việc cần làm |
+|----------|-------|-----|-----------|--------------|
+| ROUTER  | CCR2004 | .10.1 | — (uplink sfp1) | Còn VLAN30, thiếu VLAN60 mgmt, thiếu QoS backup |
+| CORE    | CRS326  | .10.2 | — | Chưa set priority=4096, thiếu VLAN60 |
+| IT-ROOM | CRS328  | .10.3 | **sfp-sfpplus2** ✅ | Còn user `admin` mặc định |
+| NHA LA  | CRS328  | .10.4 | sfp-sfpplus5 ✅ | Firewall cũ, thiếu VLAN60 |
+| APART   | CRS328  | .10.5 | sfp-sfpplus7 ✅ | Firewall cũ, thiếu VLAN60, rule trùng |
+| 10× CSS610 | CSS610-8P-2S+ | .10.6–.15 | chưa map hết | Firmware lệch 2.18/2.21 |
 
-### Việc cần xác minh
+IT-ROOM đã xác nhận đấu trực tiếp `sfp-sfpplus2` (link-ok 1Gbps, module WINTOP WT-9110G/SM/20/L; bridge host thấy MAC `04:F4:1C:D2:1D:E2` VID 10 trên cổng này). Nghi vấn link DOWN trước đó là **không đúng** — nó chỉ không trả lời MNDP trên cổng vật lý.
 
-1. **IT-ROOM không hiện là láng giềng vật lý của CORE.** NHA LA/APART xuất hiện cả trên cổng sfp lẫn vlan10-mgmt; IT-ROOM chỉ hiện trên vlan10-mgmt. Nghi vấn: link `sfp-sfpplus2` (nhãn "To IT room") đang DOWN, hoặc IT-ROOM đấu qua đường khác. Kiểm tra trên CORE:
-   ```
-   /interface ethernet monitor sfp-sfpplus2 once
-   /interface bridge host print where mac-address=04:F4:1C:D2:1D:E2
-   ```
-   Lệnh thứ 2 cho biết IT-ROOM thực sự nằm sau cổng nào.
+`sfp-sfpplus14` nhãn "To 11-12" ứng với CSS610 **Villa 11-12** (192.168.10.8).
 
-2. **CSS610 chưa xuất hiện trong mạng.** Nếu định triển khai: dùng IP `192.168.10.6` (KHÔNG dùng .4 – NHA LA đang giữ).
+### ⚠️ Vấn đề mở: số cổng trunk trên CORE không đủ
 
-3. **sfp-sfpplus14 nhãn "To 11-12"** – chưa rõ thiết bị, không thấy neighbor.
+Config `switch-core-crs326.rsc` chỉ khai báo **13 cổng trunk** (sfp-sfpplus1–13). Thực tế cần tối thiểu **14**: 1 uplink router + 3 CRS328 + 10 CSS610. Riêng `sfp-sfpplus14` đang có Villa 11-12 cắm vào nhưng **không nằm trong file config** → nếu reset+reimport sẽ mất kết nối cả nhánh đó.
+
+Lấy sơ đồ cổng thật để cập nhật file:
+```
+/interface bridge port print detail where bridge=bridge-core
+/interface bridge host print where vid=10
+```
 
 Admin user chung: `Theindochine`. File delta để đồng bộ từng thiết bị: `configs/delta/delta-*.rsc` (paste Terminal, không import).
 
