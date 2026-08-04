@@ -107,16 +107,23 @@ Setting CRS326 as Root Bridge prevents CSS610 (which had the lowest MAC address)
 
 ### WAN Monitoring Script (STEP 21)
 
+Cơ chế "pinned route + blackhole" trong bảng main (tương thích mọi bản ROS v7 — netwatch không cần tham số `routing-table`):
+
 | Component | Chi tiết |
 |-----------|---------|
-| Routing table | `wan-check-viettel` – route 8.8.8.8/32 qua pppoe-wan |
-| Netwatch | Ping 8.8.8.8 mỗi 30s qua table Viettel, timeout 5s |
+| Pinned route | 8.8.4.4/32 gateway=pppoe-wan scope=10 – chỉ active khi Viettel UP |
+| Blackhole route | 8.8.4.4/32 type=blackhole distance=254 – chặn false-UP qua VNPT khi Viettel down |
+| Netwatch | Ping 8.8.4.4 mỗi 30s, timeout 5s |
 | `wan-viettel-down` | Disable pppoe-wan → VNPT backup tự động active (distance=2) |
-| `wan-viettel-up` | Enable pppoe-wan → Viettel primary active lại (distance=1) |
+| `wan-viettel-up` | Log xác nhận Viettel primary active lại (distance=1) |
 | `wan-viettel-recovery` | Script chạy mỗi 5 phút, thử re-enable pppoe-wan khi đang failover |
 | Scheduler | `viettel-recovery-check` interval=5m – trigger recovery script |
 
-**Tại sao cần scheduler recovery**: Khi pppoe-wan bị disable, route `wan-check-viettel` biến mất → netwatch không thể tự phát hiện Viettel đã phục hồi. Scheduler định kỳ thử enable lại, sau 20s kiểm tra nếu kết nối OK thì giữ lại, nếu không thì disable tiếp.
+**Host check là 8.8.4.4, KHÔNG dùng 8.8.8.8** — 8.8.8.8 là DNS server chính; nếu blackhole nó thì DNS bị chặn khi failover.
+
+**Tại sao cần scheduler recovery**: Khi pppoe-wan bị disable, route ghim biến mất, blackhole chặn ping → netwatch không thể tự phát hiện Viettel đã phục hồi. Scheduler định kỳ thử enable lại, sau 20s kiểm tra nếu kết nối OK thì giữ lại, nếu không thì disable tiếp.
+
+**Lưu ý import**: script `source=` phải viết 1 dòng với `\n` và `\$` escape — khối `source={` nhiều dòng sẽ làm `/import` báo syntax error (chỉ paste được vào Terminal).
 
 ## WireGuard VPN
 

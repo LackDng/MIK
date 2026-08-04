@@ -700,77 +700,64 @@ add name=weekly-backup interval=7d start-time=02:00:00 \
 # ============================================================
 # STEP 21: WAN FAILOVER – AUTO-MONITORING VIETTEL → VNPT
 #
-# Cơ chế hoạt động:
-#   1. Tạo routing table riêng "wan-check-viettel" + route 8.8.8.8 qua pppoe-wan
-#      → netwatch ping 8.8.8.8 riêng qua đường Viettel, không bị ảnh hưởng bởi backup
-#   2. Viettel DOWN (PPPoE rớt hoặc mất internet):
-#        → down-script: disable pppoe-wan
-#        → RouterOS tự dùng route distance=2 (pppoe-backup VNPT) ngay lập tức
+# Cơ chế hoạt động (main table + blackhole – tương thích mọi bản ROS v7):
+#   1. Route ghim 8.8.4.4/32 qua pppoe-wan (Viettel) trong bảng main
+#      + route blackhole distance=254 làm fallback.
+#      → Khi Viettel UP: ping 8.8.4.4 đi qua Viettel.
+#      → Khi Viettel DOWN/disabled: route ghim mất, blackhole thắng
+#        → ping FAIL (không bị "false UP" do đi nhầm qua VNPT).
+#   2. Netwatch ping 8.8.4.4 mỗi 30s:
+#        → down-script: disable pppoe-wan → RouterOS tự dùng route
+#          distance=2 (pppoe-backup VNPT) ngay lập tức
+#        → up-script: log xác nhận Viettel hoạt động lại
 #   3. Recovery: scheduler chạy mỗi 5 phút, thử re-enable pppoe-wan
-#        → Nếu reconnect OK → netwatch up-script → Viettel primary (distance=1) active lại
+#        → Nếu PPPoE connect OK → route ghim active lại → netwatch UP
+#        → Nếu vẫn chết → disable lại, chờ chu kỳ sau
 #   4. Thời gian phát hiện sự cố: ≤30 giây (interval netwatch)
 #
-# LƯU Ý: Sau khi import, nhập scripts thủ công qua Winbox Terminal
-#          hoặc SSH nếu source= multiline không import được tự động.
+# LƯU Ý: Dùng 8.8.4.4 làm host check (KHÔNG dùng 8.8.8.8 vì đó là
+#        DNS server chính – blackhole nó sẽ chặn DNS khi failover).
 # ============================================================
 
-# Routing table riêng để kiểm tra internet qua Viettel độc lập
-/routing table
-add name=wan-check-viettel fib \
-    comment="Routing table Viettel health check – dùng bởi netwatch"
-
-# Route 8.8.8.8 chỉ đi qua pppoe-wan (Viettel)
-# Route này tự động mất khi pppoe-wan down → netwatch phát hiện ngay
+# Route ghim: 8.8.4.4 chỉ đi qua pppoe-wan (Viettel)
+# Route tự động mất khi pppoe-wan down/disabled
 /ip route
-add dst-address=8.8.8.8/32 gateway=pppoe-wan \
-    routing-table=wan-check-viettel scope=10 \
+add dst-address=8.8.4.4/32 gateway=pppoe-wan scope=10 \
     comment="Viettel health check route – active khi pppoe-wan UP"
+# Blackhole fallback: khi route ghim mất, ping 8.8.4.4 FAIL thay vì đi qua VNPT
+add dst-address=8.8.4.4/32 type=blackhole distance=254 \
+    comment="Viettel health check blackhole – chặn false-UP qua VNPT"
 
 # ---- SCRIPTS ----
 # Script 1: Kích hoạt khi Viettel DOWN (netwatch down-script)
 /system script
 add name=wan-viettel-down \
     policy=read,write,policy,test \
-    comment="WAN failover: disable Viettel khi mất internet, VNPT backup active" \
+    comment="WAN failover: disable Viettel khi mat internet, VNPT backup active" \
     source=":log warning \"WAN-FAILOVER: Viettel DOWN - disabling pppoe-wan, switching to VNPT backup\"\n/interface pppoe-client disable [find name=pppoe-wan]"
 
 # Script 2: Kích hoạt khi Viettel UP trở lại (netwatch up-script)
 add name=wan-viettel-up \
     policy=read,write,policy,test \
-    comment="WAN restore: enable Viettel khi phục hồi, Viettel primary active lại" \
-    source=":log warning \"WAN-FAILOVER: Viettel UP - enabling pppoe-wan, reverting to Viettel as primary\"\n/interface pppoe-client enable [find name=pppoe-wan]"
+    comment="WAN restore: Viettel phuc hoi, primary distance=1 active lai" \
+    source=":log warning \"WAN-FAILOVER: Viettel UP - Viettel is primary again (distance=1)\""
 
 # Script 3: Thử phục hồi Viettel định kỳ (dùng bởi scheduler bên dưới)
 # Logic: nếu pppoe-wan đang disabled → enable → chờ 20s → kiểm tra running
 #        Nếu vẫn không connect → disable lại → thử lại sau 5 phút
+# (source viết 1 dòng, escape \$ và \n để /import không báo lỗi)
 add name=wan-viettel-recovery \
     policy=read,write,policy,test \
-    comment="Thử re-enable pppoe-wan mỗi 5 phút khi đang failover sang VNPT" \
-    source={
-:local disabled [/interface pppoe-client get [find name=pppoe-wan] disabled]
-:if ($disabled = true) do={
-    :log info "WAN-RECOVERY: pppoe-wan disabled, testing Viettel reconnect..."
-    /interface pppoe-client enable [find name=pppoe-wan]
-    :delay 20s
-    :local running [/interface pppoe-client get [find name=pppoe-wan] running]
-    :if ($running = false) do={
-        :log info "WAN-RECOVERY: Viettel still unreachable, disabling pppoe-wan again"
-        /interface pppoe-client disable [find name=pppoe-wan]
-    } else={
-        :log warning "WAN-RECOVERY: Viettel reconnected OK, netwatch will confirm and activate primary"
-    }
-}
-}
+    comment="Thu re-enable pppoe-wan moi 5 phut khi dang failover sang VNPT" \
+    source=":local wanDisabled [/interface pppoe-client get [find name=pppoe-wan] disabled]\n:if (\$wanDisabled = true) do={\n    :log info \"WAN-RECOVERY: pppoe-wan disabled, testing Viettel reconnect...\"\n    /interface pppoe-client enable [find name=pppoe-wan]\n    :delay 20s\n    :local wanRunning [/interface pppoe-client get [find name=pppoe-wan] running]\n    :if (\$wanRunning = false) do={\n        :log info \"WAN-RECOVERY: Viettel still unreachable, disabling pppoe-wan again\"\n        /interface pppoe-client disable [find name=pppoe-wan]\n    } else={\n        :log warning \"WAN-RECOVERY: Viettel reconnected OK, primary active again\"\n    }\n}"
 
 # ---- NETWATCH ----
-# Ping 8.8.8.8 qua wan-check-viettel mỗi 30s, timeout 5s
-# → down-script khi fail, up-script khi recover
+# Ping 8.8.4.4 mỗi 30s (route ghim đảm bảo chỉ test qua Viettel)
 /tool netwatch
-add host=8.8.8.8 interval=30s timeout=5s \
-    routing-table=wan-check-viettel \
+add host=8.8.4.4 interval=30s timeout=5s \
     up-script="/system script run wan-viettel-up" \
     down-script="/system script run wan-viettel-down" \
-    comment="Monitor Viettel – ping 8.8.8.8 via wan-check-viettel routing table"
+    comment="Monitor Viettel – ping 8.8.4.4 (pinned route via pppoe-wan)"
 
 # ---- SCHEDULER ----
 # Scheduler thử phục hồi Viettel mỗi 5 phút
