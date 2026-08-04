@@ -25,23 +25,32 @@
 # | Port 1–8 | PoE access ports – not configured (reserved)    |
 # +--------+----------------------------------------------------+
 #
-# !! CẦN XÁC NHẬN: đầu CORE cắm vào port nào?
-#    Thiết kế cũ ghi CRS326 sfp-sfpplus2 → CSS610, NHƯNG backup thực tế
-#    (04/08/2026) cho thấy comment interface trên CORE là:
-#      sfp-sfpplus2  = "To IT room"    (CRS328 IT-ROOM)
-#      sfp-sfpplus5  = "To Nha la"     (CRS328 NHA LA)
-#      sfp-sfpplus7  = "To Apartmen"   (CRS328 APART)
-#      sfp-sfpplus14 = "To 11-12"      (chưa rõ thiết bị – có thể là CSS610)
-#    → CSS610 có thể đang nằm ở sfp-sfpplus14, hoặc chưa được triển khai.
-#    Kiểm tra bằng: /ip neighbor print   (chạy trên CORE)
+# ============================================================
+# !! TRẠNG THÁI: CSS610 CHƯA CÓ TRONG MẠNG (xác nhận 04/08/2026)
+# ============================================================
+# `/ip neighbor print` trên CORE chỉ thấy 4 thiết bị RouterOS:
+#   ROUTER (.1), IT-ROOM (.3), NHA LA (.4 – sfp5), APART (.5 – sfp7).
+# Không có thiết bị SwOS nào → CSS610 chưa cắm điện / chưa đấu uplink /
+# chưa triển khai. File này là HƯỚNG DẪN CHO KHI TRIỂN KHAI.
 #
-# MANAGEMENT IP: 192.168.10.4/24 (VLAN10), GW: 192.168.10.1
-# Access: http://192.168.10.4
+# !! ĐỔI IP QUẢN TRỊ: 192.168.10.4 → 192.168.10.6
+#    Lý do: .4 ĐANG ĐƯỢC NHA LA (CRS328) SỬ DỤNG. Nếu đặt CSS610 = .4
+#    sẽ gây XUNG ĐỘT IP, mất quản trị NHA LA.
+#    IP đã dùng: .1 ROUTER | .2 CORE | .3 IT-ROOM | .4 NHA LA | .5 APART
+#
+# !! CỔNG UPLINK trên CORE: chọn cổng trunk còn trống khi triển khai.
+#    Cổng đang dùng: sfp1 (→ROUTER), sfp2 (→IT-ROOM), sfp5 (→NHA LA),
+#                    sfp7 (→APART), sfp14 (nhãn "To 11-12", chưa rõ)
+#    Mọi cổng sfp-sfpplus1–13 trên CORE đã cấu hình sẵn trunk all-VLAN
+#    → chỉ cần cắm module + fiber là chạy.
+#
+# MANAGEMENT IP: 192.168.10.6/24 (VLAN10), GW: 192.168.10.1
+# Access: http://192.168.10.6
 # ============================================================
 
 # ============================================================
 # CSS610 – SwOS Web UI Configuration Steps
-# Truy cập: http://192.168.10.4 (VLAN10)
+# Truy cập: http://192.168.10.6 (VLAN10)
 # ============================================================
 
 # ============================================================
@@ -49,7 +58,7 @@
 # ============================================================
 #
 #   Identity         : CSS610-Access2
-#   IP Address       : 192.168.10.4
+#   IP Address       : 192.168.10.6
 #   Subnet Mask      : 255.255.255.0
 #   Default Gateway  : 192.168.10.1
 #   VLAN ID (mgmt)   : 10
@@ -139,7 +148,7 @@
 #
 # 1. SwOS không có CLI – tất cả cấu hình qua Web UI
 # 2. Sau khi cấu hình System tab → Apply → thiết bị reboot
-# 3. Truy cập lại qua http://192.168.10.4 (cần PC trên VLAN10)
+# 3. Truy cập lại qua http://192.168.10.6 (cần PC trên VLAN10)
 # 4. Backup config: System tab → Backup button → lưu file .swb
 # 5. Module SFP: S-31DLC20D (1G Single-mode) cắm Port 9
 #    Cáp: LC-LC Single-mode OS2
@@ -150,6 +159,6 @@
 # 1. Cắm trực tiếp PC vào Port 1 (copper PoE)
 # 2. Set PC IP: 192.168.88.x/24 (SwOS default: 192.168.88.1)
 # 3. Truy cập http://192.168.88.1
-# 4. Cấu hình System tab: IP=192.168.10.4, VLAN=10, GW=192.168.10.1
+# 4. Cấu hình System tab: IP=192.168.10.6, VLAN=10, GW=192.168.10.1
 # 5. Apply → reboot → cắm Port 9 lên Core CRS326
 # ============================================================
