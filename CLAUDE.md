@@ -262,6 +262,8 @@ Xác minh 04/08/2026 bằng `/interface bridge host print where vid=10` — đ�
 
 Bảng VLAN đã xác nhận có đủ `sfp-sfpplus14` → Bungalow 11-12 hoạt động bình thường.
 
+**MAC `A4:4C:C8:10:AE:8A` trên sfp-sfpplus1** = PC quản trị của admin (192.168.10.50), nằm sau router trên VLAN10. Đã xác nhận — không phải thiết bị lạ, không cần điều tra lại.
+
 ### ⚠️ VLAN 30 VẪN CÒN TRÊN CORE
 
 `/interface bridge vlan print` cho thấy CORE vẫn có `vlan-ids=30` trên toàn bộ 14 cổng. Router cũng còn VLAN30. Trình tự gỡ an toàn:
