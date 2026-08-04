@@ -45,6 +45,8 @@
 #   VLAN ID (mgmt)   : 10
 #   Allow From       : 192.168.10.0/24, 192.168.0.0/24  ← VLAN10 và VLAN60
 #   DNS Server       : 8.8.8.8
+#   IGMP Snooping    : ☑ Enable  ← đồng bộ với CCR2004/CRS326/CRS328
+#                        (giảm multicast flood IPTV/camera)
 #
 
 # ============================================================

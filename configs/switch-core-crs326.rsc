@@ -194,7 +194,7 @@ add chain=input action=accept \
     protocol=tcp dst-port=22 src-address=10.10.10.0/24 \
     comment="SSH from VPN"
 add chain=input action=drop \
-    log=yes log-prefix="SW-DROP: " \
+    log=yes log-prefix="INPUT-DROP: " \
     comment="Default drop INPUT"
 
 # ============================================================

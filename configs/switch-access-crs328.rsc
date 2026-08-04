@@ -26,6 +26,9 @@
 # NOTE: S-31DLC20D is a 1G SFP module in a 10G port.
 #       RouterOS will auto-negotiate to 1G – normal behavior.
 #
+# STP: CRS328 non-root (priority default 32768)
+#      Root Bridge = CRS326 (4096), Secondary = CCR2004 (8192)
+#
 # MANAGEMENT IP: 192.168.10.3/24 (VLAN10), GW: 192.168.10.1
 # ============================================================
 
@@ -37,9 +40,13 @@
 
 # ============================================================
 # STEP 2: BRIDGE + VLAN FILTERING
+# igmp-snooping=yes: đồng bộ với CCR2004/CRS326 – giảm multicast
+# flood cho IPTV (VLAN40) và camera (VLAN70)
 # ============================================================
 /interface bridge
-add name=bridge-access vlan-filtering=yes comment="Access switch bridge"
+add name=bridge-access vlan-filtering=yes \
+    igmp-snooping=yes \
+    comment="Access switch bridge – non-root (default 32768)"
 
 /interface bridge port
 add bridge=bridge-access interface=sfp-sfpplus1 \
@@ -161,10 +168,15 @@ add chain=input action=accept \
     src-address=192.168.0.0/24 \
     comment="Whitelist VLAN60 Office – bypass brute-force check"
 
-# R7: ICMP from MGMT
+# R7: ICMP rate-limited (đồng bộ với CRS326)
 add chain=input action=accept \
-    protocol=icmp in-interface-list=MGMT \
-    comment="R7 ICMP from MGMT"
+    protocol=icmp limit=10,5:packet \
+    comment="R7 ICMP rate-limited 10pps"
+
+# R7b: Drop excess ICMP
+add chain=input action=drop \
+    protocol=icmp \
+    comment="R7b Drop excess ICMP"
 
 # R8: Winbox từ VLAN10
 add chain=input action=accept \

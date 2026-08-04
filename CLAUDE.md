@@ -95,7 +95,7 @@ All 13 active ports (sfp-sfpplus1–13) are trunk ports (admit-only-vlan-tagged)
 | CRS328  | 32768 (default) | Non-root              |
 | CSS610  | N/A (SwOS)      | STP disabled          |
 
-Setting CRS326 as Root Bridge prevents CSS610 (which had the lowest MAC address) from winning the RSTP election and causing TCN broadcast storms. Both CRS326 and CCR2004 have `igmp-snooping=yes` on their bridge to reduce multicast flooding (IPTV/camera traffic).
+Setting CRS326 as Root Bridge prevents CSS610 (which had the lowest MAC address) from winning the RSTP election and causing TCN broadcast storms. IGMP snooping is enabled on ALL devices — `igmp-snooping=yes` on CCR2004/CRS326/CRS328 bridges, IGMP Snooping checkbox in CSS610 SwOS System tab — to reduce multicast flooding (IPTV/camera traffic).
 
 ## WAN Failover
 
@@ -188,5 +188,5 @@ Active development branch: `claude/config-file-setup-E6YE9`
 4. **Dual PPPoE failover**: No external keepalive scripts needed — RouterOS native routing distance handles automatic failover.
 5. **Hairpin NAT Option A + B** (both enabled): Option A = access NVR via direct LAN IP (192.168.5.254:8054). Option B = access NVR via public IP (e.g. 117.2.11.52:8054) from inside LAN — DSTNAT intercepts LOCAL_NETS→port 8054/8053 and redirects to NVR LAN IP; SRCNAT masquerades so NVR replies via router. No hardcoded public IP (dynamic PPPoE safe).
 6. **CRS326 as RSTP Root Bridge** (priority=4096): Prevents CSS610 (lowest MAC) from winning root election and causing TCN broadcast storms on every link-state change.
-7. **IGMP snooping** on CRS326 and CCR2004 bridges: Reduces multicast flooding to only ports with active IGMP listeners (important for IPTV and camera streams).
+7. **IGMP snooping on all 4 devices** (CCR2004, CRS326, CRS328 bridges + CSS610 SwOS checkbox): Reduces multicast flooding to only ports with active IGMP listeners (important for IPTV and camera streams).
 8. **QoS duplicated for both WAN interfaces**: Mangle marks and queue trees are replicated for pppoe-wan and pppoe-backup so QoS remains active during failover.
