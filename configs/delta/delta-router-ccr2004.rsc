@@ -65,12 +65,14 @@ add name=q-guest-bk  parent=wan-upload-bk packet-mark=guest  priority=8 limit-at
 /routing table remove [find name=wan-check-viettel]
 
 # 6b. Route ghim + blackhole (8.8.4.4 – KHÔNG dùng 8.8.8.8 vì là DNS chính)
-# CÚ PHÁP: ROS v7 dùng "blackhole=yes"; "type=blackhole" (v6) sẽ báo
-#          "bad parameter type"
+# CÚ PHÁP ROS v7: "blackhole" là FLAG đứng một mình (đã test trên thiết bị)
+#   type=blackhole  → bad parameter type
+#   blackhole=yes   → expected end of command
+#   blackhole       → ĐÚNG
 /ip route
 add dst-address=8.8.4.4/32 gateway=pppoe-wan scope=10 \
     comment="Viettel health check route - active khi pppoe-wan UP"
-add dst-address=8.8.4.4/32 blackhole=yes distance=254 \
+add dst-address=8.8.4.4/32 blackhole distance=254 \
     comment="Viettel health check blackhole - chan false-UP qua VNPT"
 
 # 6c. Sửa up-script thành log-only (bản cũ enable pppoe-wan là dead-code)

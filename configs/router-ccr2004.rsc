@@ -739,8 +739,11 @@ add name=weekly-backup interval=7d start-time=02:00:00 \
 add dst-address=8.8.4.4/32 gateway=pppoe-wan scope=10 \
     comment="Viettel health check route – active khi pppoe-wan UP"
 # Blackhole fallback: khi route ghim mất, ping 8.8.4.4 FAIL thay vì đi qua VNPT
-# LƯU Ý CÚ PHÁP: ROS v7 dùng "blackhole=yes", KHÔNG phải "type=blackhole" (v6)
-add dst-address=8.8.4.4/32 blackhole=yes distance=254 \
+# LƯU Ý CÚ PHÁP ROS v7: "blackhole" là FLAG đứng một mình.
+#   type=blackhole  → bad parameter type      (cú pháp v6)
+#   blackhole=yes   → expected end of command (không nhận gán giá trị)
+#   blackhole       → ĐÚNG
+add dst-address=8.8.4.4/32 blackhole distance=254 \
     comment="Viettel health check blackhole – chặn false-UP qua VNPT"
 
 # ---- SCRIPTS ----

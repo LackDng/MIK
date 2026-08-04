@@ -113,7 +113,7 @@ Cơ chế "pinned route + blackhole" trong bảng main (tương thích mọi b�
 | Component | Chi tiết |
 |-----------|---------|
 | Pinned route | 8.8.4.4/32 gateway=pppoe-wan scope=10 – chỉ active khi Viettel UP |
-| Blackhole route | 8.8.4.4/32 **blackhole=yes** distance=254 – chặn false-UP qua VNPT khi Viettel down |
+| Blackhole route | 8.8.4.4/32 **blackhole** distance=254 – chặn false-UP qua VNPT khi Viettel down |
 | Netwatch | Ping 8.8.4.4 mỗi 30s, timeout 5s |
 | `wan-viettel-down` | Disable pppoe-wan → VNPT backup tự động active (distance=2) |
 | `wan-viettel-up` | Log xác nhận Viettel primary active lại (distance=1) |
@@ -126,7 +126,13 @@ Cơ chế "pinned route + blackhole" trong bảng main (tương thích mọi b�
 
 **Lưu ý import**: script `source=` phải viết 1 dòng với `\n` và `\$` escape — khối `source={` nhiều dòng sẽ làm `/import` báo syntax error (chỉ paste được vào Terminal).
 
-**Cú pháp blackhole ROS v7**: dùng `blackhole=yes`, KHÔNG dùng `type=blackhole` (cú pháp v6 — v7 báo `bad parameter type`).
+**Cú pháp blackhole ROS v7** (đã test trên CCR2004 thật): `blackhole` là **flag đứng một mình**.
+
+| Cú pháp | Kết quả |
+|---------|---------|
+| `type=blackhole` | ❌ `bad parameter type` (cú pháp v6) |
+| `blackhole=yes` | ❌ `expected end of command` |
+| `blackhole` | ✅ Đúng |
 
 ## WireGuard VPN
 
