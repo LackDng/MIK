@@ -562,15 +562,29 @@ add chain=forward action=drop \
 /ip firewall nat
 
 # WAN Port Forwarding (internet → NVR)
+# QUYẾT ĐỊNH THIẾT KẾ: chỉ mở port qua đường Viettel (in-interface=pppoe-wan),
+# KHÔNG dùng in-interface-list=WAN. Lý do: IP public chỉ ổn định trên Viettel;
+# VNPT chỉ làm backup ra internet, không phục vụ truy cập từ ngoài vào.
+# HỆ QUẢ: khi failover sang VNPT, xem camera từ xa qua IP public sẽ KHÔNG hoạt
+#         động cho tới khi Viettel phục hồi (truy cập nội bộ + VPN vẫn bình thường).
 add chain=dstnat action=dst-nat \
-    in-interface-list=WAN protocol=tcp dst-port=8054 \
+    in-interface=pppoe-wan protocol=tcp dst-port=8054 \
     to-addresses=192.168.5.254 to-ports=8054 \
     comment="DSTNAT WAN:8054 to NVR-1"
 
 add chain=dstnat action=dst-nat \
-    in-interface-list=WAN protocol=tcp dst-port=8053 \
+    in-interface=pppoe-wan protocol=tcp dst-port=8053 \
     to-addresses=192.168.5.253 to-ports=8053 \
     comment="DSTNAT WAN:8053 to NVR-2"
+
+# Port forwarding SQL Server (rule đang chạy thực tế trên router)
+# !! CẢNH BÁO BẢO MẬT: mở port 1433 trực tiếp ra internet là rủi ro cao
+# !! (brute-force SA account, ransomware quét cổng 1433 diện rộng).
+# !! Khuyến nghị: xóa rule này, truy cập SQL qua WireGuard VPN thay thế.
+add chain=dstnat action=dst-nat \
+    in-interface=pppoe-wan protocol=tcp dst-port=1433 \
+    to-addresses=192.168.0.254 to-ports=1433 \
+    comment="DSTNAT WAN:1433 to SQL 192.168.0.254 [RUI RO - nen dung VPN]"
 
 # Hairpin Option B – LAN truy cập NVR qua IP public (ENABLED)
 # Bắt gói tin từ LOCAL_NETS đến port 8054/8053 (dù dst-address là IP public nào)
@@ -725,7 +739,8 @@ add name=weekly-backup interval=7d start-time=02:00:00 \
 add dst-address=8.8.4.4/32 gateway=pppoe-wan scope=10 \
     comment="Viettel health check route – active khi pppoe-wan UP"
 # Blackhole fallback: khi route ghim mất, ping 8.8.4.4 FAIL thay vì đi qua VNPT
-add dst-address=8.8.4.4/32 type=blackhole distance=254 \
+# LƯU Ý CÚ PHÁP: ROS v7 dùng "blackhole=yes", KHÔNG phải "type=blackhole" (v6)
+add dst-address=8.8.4.4/32 blackhole=yes distance=254 \
     comment="Viettel health check blackhole – chặn false-UP qua VNPT"
 
 # ---- SCRIPTS ----

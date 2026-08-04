@@ -65,10 +65,12 @@ add name=q-guest-bk  parent=wan-upload-bk packet-mark=guest  priority=8 limit-at
 /routing table remove [find name=wan-check-viettel]
 
 # 6b. Route ghim + blackhole (8.8.4.4 – KHÔNG dùng 8.8.8.8 vì là DNS chính)
+# CÚ PHÁP: ROS v7 dùng "blackhole=yes"; "type=blackhole" (v6) sẽ báo
+#          "bad parameter type"
 /ip route
 add dst-address=8.8.4.4/32 gateway=pppoe-wan scope=10 \
     comment="Viettel health check route - active khi pppoe-wan UP"
-add dst-address=8.8.4.4/32 type=blackhole distance=254 \
+add dst-address=8.8.4.4/32 blackhole=yes distance=254 \
     comment="Viettel health check blackhole - chan false-UP qua VNPT"
 
 # 6c. Sửa up-script thành log-only (bản cũ enable pppoe-wan là dead-code)
@@ -86,12 +88,23 @@ add host=8.8.4.4 interval=30s timeout=5s \
 # viettel-recovery-check ĐÃ có sẵn trên router (giữ nguyên)
 
 # ------------------------------------------------------------
-# 7. KIỂM TRA RULE NAT TRÙNG (backup nghi có 2x DSTNAT 8053
-#    và 2x SRCNAT masquerade)
+# 7. NAT – ĐÃ KIỂM TRA TRÊN THIẾT BỊ THẬT (04/08/2026)
+#    Kết quả: KHÔNG có rule trùng. Rule #2 là port-forward SQL 1433
+#    bị dán nhầm comment của NVR-2 → chỉ cần sửa comment.
 # ------------------------------------------------------------
-/ip firewall nat print where comment~"DSTNAT WAN"
-/ip firewall nat print where comment="SRCNAT Masquerade to WAN"
-# Nếu thấy rule trùng lặp → remove numbers=<số của rule thừa>
+/ip firewall nat set [find comment="DSTNAT WAN:8053 to NVR-2" and dst-port=1433] \
+    comment="DSTNAT WAN:1433 to SQL 192.168.0.254 [RUI RO - nen dung VPN]"
+
+# QUYẾT ĐỊNH THIẾT KẾ (user xác nhận 04/08/2026):
+#   Giữ nguyên in-interface=pppoe-wan cho TẤT CẢ rule DSTNAT.
+#   Chỉ NAT vào qua đường Viettel, KHÔNG mở port qua VNPT.
+#   → Khi failover, port forwarding ngừng cho tới khi Viettel phục hồi.
+#   → Truy cập nội bộ (hairpin) và VPN không bị ảnh hưởng.
+# KHÔNG chạy lệnh đổi sang in-interface-list=WAN.
+
+# !! CẢNH BÁO: rule 1433 (SQL Server) mở thẳng ra internet là rủi ro cao.
+# !! Nếu muốn gỡ và chuyển sang truy cập qua WireGuard VPN:
+# /ip firewall nat remove [find dst-port=1433 chain=dstnat]
 
 # ------------------------------------------------------------
 # 8. KIỂM TRA SAU KHI CHẠY

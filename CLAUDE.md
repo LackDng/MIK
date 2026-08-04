@@ -69,7 +69,8 @@ Management access: Winbox (8291) + SSH (22) allowed from VLAN10 (192.168.10.0/24
 | ether1         | WAN BACKUP – PPPoE dự phòng (pppoe-backup, distance=2) |
 | sfp-sfpplus1   | Trunk → Core CRS326 (S+31DLC10D 10G SMF)      |
 | ether2         | VLAN10 ACCESS – Management (direct PC)         |
-| ether3–ether10 | Reserved (not used)                            |
+| ether3–ether9  | Reserved (not used)                            |
+| ether10        | VLAN60 ACCESS – Office (pvid=60, đang dùng thực tế) |
 | ether11–ether16| VLAN70 ACCESS – Camera/NVR (pvid=70, untagged) |
 
 **Note on ether15/16**: ether15 connects to a single NVR (no downstream switch). ether16 connects to a dedicated camera switch that does NOT uplink back to CRS326. No physical loop exists on these ports.
@@ -112,7 +113,7 @@ Cơ chế "pinned route + blackhole" trong bảng main (tương thích mọi b�
 | Component | Chi tiết |
 |-----------|---------|
 | Pinned route | 8.8.4.4/32 gateway=pppoe-wan scope=10 – chỉ active khi Viettel UP |
-| Blackhole route | 8.8.4.4/32 type=blackhole distance=254 – chặn false-UP qua VNPT khi Viettel down |
+| Blackhole route | 8.8.4.4/32 **blackhole=yes** distance=254 – chặn false-UP qua VNPT khi Viettel down |
 | Netwatch | Ping 8.8.4.4 mỗi 30s, timeout 5s |
 | `wan-viettel-down` | Disable pppoe-wan → VNPT backup tự động active (distance=2) |
 | `wan-viettel-up` | Log xác nhận Viettel primary active lại (distance=1) |
@@ -124,6 +125,8 @@ Cơ chế "pinned route + blackhole" trong bảng main (tương thích mọi b�
 **Tại sao cần scheduler recovery**: Khi pppoe-wan bị disable, route ghim biến mất, blackhole chặn ping → netwatch không thể tự phát hiện Viettel đã phục hồi. Scheduler định kỳ thử enable lại, sau 20s kiểm tra nếu kết nối OK thì giữ lại, nếu không thì disable tiếp.
 
 **Lưu ý import**: script `source=` phải viết 1 dòng với `\n` và `\$` escape — khối `source={` nhiều dòng sẽ làm `/import` báo syntax error (chỉ paste được vào Terminal).
+
+**Cú pháp blackhole ROS v7**: dùng `blackhole=yes`, KHÔNG dùng `type=blackhole` (cú pháp v6 — v7 báo `bad parameter type`).
 
 ## WireGuard VPN
 
@@ -149,7 +152,15 @@ Cơ chế "pinned route + blackhole" trong bảng main (tương thích mọi b�
 | NVR-2  | 192.168.5.253  | 8053     | Allowed  |
 | Camera | 192.168.5.1–100| —        | BLOCKED  |
 
-Port forwarding: WAN:8054 → NVR-1, WAN:8053 → NVR-2
+Port forwarding (chỉ qua **Viettel** – `in-interface=pppoe-wan`, không dùng interface-list WAN):
+
+| Port | Đích | Ghi chú |
+|------|------|---------|
+| 8054 | NVR-1 192.168.5.254 | |
+| 8053 | NVR-2 192.168.5.253 | |
+| 1433 | SQL 192.168.0.254 | ⚠️ Rủi ro bảo mật – nên chuyển sang truy cập qua VPN |
+
+**Khi failover sang VNPT, port forwarding ngừng hoạt động** (thiết kế có chủ đích — IP public chỉ ổn định trên Viettel). Truy cập nội bộ và qua WireGuard VPN vẫn bình thường.
 
 ## QoS Priority
 
