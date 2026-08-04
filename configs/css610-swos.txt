@@ -25,6 +25,16 @@
 # | Port 1–8 | PoE access ports – not configured (reserved)    |
 # +--------+----------------------------------------------------+
 #
+# !! CẦN XÁC NHẬN: đầu CORE cắm vào port nào?
+#    Thiết kế cũ ghi CRS326 sfp-sfpplus2 → CSS610, NHƯNG backup thực tế
+#    (04/08/2026) cho thấy comment interface trên CORE là:
+#      sfp-sfpplus2  = "To IT room"    (CRS328 IT-ROOM)
+#      sfp-sfpplus5  = "To Nha la"     (CRS328 NHA LA)
+#      sfp-sfpplus7  = "To Apartmen"   (CRS328 APART)
+#      sfp-sfpplus14 = "To 11-12"      (chưa rõ thiết bị – có thể là CSS610)
+#    → CSS610 có thể đang nằm ở sfp-sfpplus14, hoặc chưa được triển khai.
+#    Kiểm tra bằng: /ip neighbor print   (chạy trên CORE)
+#
 # MANAGEMENT IP: 192.168.10.4/24 (VLAN10), GW: 192.168.10.1
 # Access: http://192.168.10.4
 # ============================================================
@@ -88,11 +98,23 @@
 # Port 9 (SFP):
 #   PVID        : 1    (default, trunk port không cần pvid)
 #   Type        : Trunk
-#   STP         : disabled (L2 switch đơn, không cần STP)
+#   RSTP        : ☑ Enable   ← ĐỔI: trước đây để disabled
 #   Flow Control: disabled
+#
+# Vì sao giờ BẬT được RSTP (trước khuyến nghị tắt):
+#   Sau khi CRS326 (CORE) đặt priority=4096, CORE luôn thắng bầu cử Root
+#   Bridge bất kể MAC. CSS610 không còn khả năng cướp ngôi root → bật RSTP
+#   là an toàn và có thêm lợi ích: chống loop nếu ai đó cắm nhầm 2 port
+#   vào cùng một switch.
+#   → Nếu firmware SwOS không có mục RSTP, để disabled cũng chấp nhận được
+#     (CSS610 chỉ có 1 uplink duy nhất, không có đường dự phòng).
 #
 # Port 1–8 (PoE copper – chưa dùng):
 #   Để mặc định hoặc disable nếu cần bảo mật
+#   !! Khi bắt đầu dùng: PHẢI gán VLAN cho port (tab VLAN + đặt PVID),
+#   !! nếu không thiết bị sẽ nằm ở VLAN 1 và không đi đâu được.
+#   !! Ví dụ cắm AP office: PVID=60, tab VLAN cột port đó chọn U cho VLAN 60
+#   !!                      (nếu AP cần thêm SSID Guest thì VLAN 20 = T)
 #
 
 # ============================================================

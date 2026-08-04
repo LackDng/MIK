@@ -23,7 +23,8 @@
 # | ether1         | WAN BACKUP  – PPPoE dự phòng (failover)        |
 # | sfp-sfpplus1   | Trunk to Core CRS326 (S+31DLC10D 10G SMF)    |
 # | ether2         | VLAN 10 ACCESS – Management (direct PC access)|
-# | ether3-ether10 | Reserved (not used)                           |
+# | ether3-ether9  | Reserved (not used)                           |
+# | ether10        | VLAN 60 ACCESS – Office (pvid=60, đang dùng)  |
 # | ether11-ether16| VLAN 70 ACCESS – Camera/NVR (untagged pvid=70)|
 # +----------------+-----------------------------------------------+
 #
@@ -54,6 +55,9 @@ add bridge=bridge-lan interface=sfp-sfpplus1 \
 add bridge=bridge-lan interface=ether2 \
     pvid=10 frame-types=admit-only-untagged-and-priority-tagged \
     comment="VLAN10 Management – direct PC access"
+add bridge=bridge-lan interface=ether10 \
+    pvid=60 frame-types=admit-only-untagged-and-priority-tagged \
+    comment="VLAN60 Office access – đang dùng thực tế"
 add bridge=bridge-lan interface=ether11 \
     pvid=70 frame-types=admit-only-untagged-and-priority-tagged \
     comment="VLAN70 CCTV access"
@@ -89,7 +93,8 @@ add bridge=bridge-lan vlan-ids=40 \
 add bridge=bridge-lan vlan-ids=50 \
     tagged=bridge-lan,sfp-sfpplus1
 add bridge=bridge-lan vlan-ids=60 \
-    tagged=bridge-lan,sfp-sfpplus1
+    tagged=bridge-lan,sfp-sfpplus1 \
+    untagged=ether10
 add bridge=bridge-lan vlan-ids=70 \
     tagged=bridge-lan,sfp-sfpplus1 \
     untagged=ether11,ether12,ether13,ether14,ether15,ether16

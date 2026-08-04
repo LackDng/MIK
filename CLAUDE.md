@@ -93,10 +93,22 @@ All 13 active ports (sfp-sfpplus1–13) are trunk ports (admit-only-vlan-tagged)
 |---------|-----------------|-----------------------|
 | CRS326  | 4096            | RSTP Root Bridge      |
 | CCR2004 | 8192            | Secondary Root        |
-| CRS328  | 32768 (default) | Non-root              |
-| CSS610  | N/A (SwOS)      | STP disabled          |
+| CRS328 ×3 | 32768 (default) | Non-root            |
+| CSS610  | N/A (SwOS)      | RSTP bật được sau khi CORE=4096 |
 
-Setting CRS326 as Root Bridge prevents CSS610 (which had the lowest MAC address) from winning the RSTP election and causing TCN broadcast storms. IGMP snooping is enabled on ALL devices — `igmp-snooping=yes` on CCR2004/CRS326/CRS328 bridges, IGMP Snooping checkbox in CSS610 SwOS System tab — to reduce multicast flooding (IPTV/camera traffic).
+Setting CRS326 as Root Bridge prevents the access switches from winning the RSTP election and causing TCN broadcast storms.
+
+**Đính chính chẩn đoán cũ (dựa trên backup 04/08/2026)**: MAC `04:F4:1C:D2:1D:E2` từng bị quy cho CSS610 thực ra là `sfp-sfpplus1` của **IT-ROOM (CRS328)**. Dải MAC thực tế:
+
+| Thiết bị | MAC thấp nhất |
+|----------|---------------|
+| IT-ROOM (CRS328) | `04:f4:1c:d2:1d:ca` ← thấp nhất toàn hệ thống |
+| NHA LA (CRS328)  | `04:f4:1c:d2:80:9d` |
+| APART (CRS328)   | `04:f4:1c:d2:8a:0a` |
+| CCR2004 Router   | `d0:ea:11:1d:db:7f` |
+| CORE (CRS326)    | `d0:ea:11:72:28:b6` ← cao nhất |
+
+Cả 3 CRS328 (`04:f4:…`) đều có MAC thấp hơn CORE (`d0:ea:…`), nên khi mọi bridge để priority mặc định 32768 thì **IT-ROOM** mới là Root Bridge, không phải CSS610. Cách khắc phục không đổi: đặt CORE priority=4096 để thắng bầu cử bất kể MAC. IGMP snooping is enabled on ALL devices — `igmp-snooping=yes` on CCR2004/CRS326/CRS328 bridges, IGMP Snooping checkbox in CSS610 SwOS System tab — to reduce multicast flooding (IPTV/camera traffic).
 
 ## WAN Failover
 
