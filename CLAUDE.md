@@ -237,13 +237,25 @@ IT-ROOM đã xác nhận đấu trực tiếp `sfp-sfpplus2` (link-ok 1Gbps, mod
 
 `sfp-sfpplus14` nhãn "To 11-12" ứng với CSS610 **Villa 11-12** (192.168.10.8).
 
-### ⚠️ Vấn đề mở: số cổng trunk trên CORE không đủ
+### CORE – bản đồ 14 cổng trunk (xác nhận `/interface bridge port print`)
 
-Config `switch-core-crs326.rsc` chỉ khai báo **13 cổng trunk** (sfp-sfpplus1–13). Thực tế cần tối thiểu **14**: 1 uplink router + 3 CRS328 + 10 CSS610. Riêng `sfp-sfpplus14` đang có Villa 11-12 cắm vào nhưng **không nằm trong file config** → nếu reset+reimport sẽ mất kết nối cả nhánh đó.
+Tất cả 14 cổng đều `admit-only-vlan-tagged` + HW-offload. Con số khớp chính xác: **1 uplink router + 3 CRS328 + 10 CSS610 = 14**.
 
-Lấy sơ đồ cổng thật để cập nhật file:
+| Cổng | Thiết bị |
+|------|----------|
+| sfp-sfpplus1 | Uplink → ROUTER |
+| sfp-sfpplus2 | CRS328 IT-ROOM (.10.3) |
+| sfp-sfpplus5 | CRS328 NHA LA (.10.4) |
+| sfp-sfpplus7 | CRS328 APART (.10.5) |
+| sfp-sfpplus14 | CSS610 Villa 11-12 (.10.8) |
+| sfp3,4,6,8–13 | 9× CSS610 còn lại – **chưa map cụ thể** |
+
+Đã bổ sung `sfp-sfpplus14` vào `switch-core-crs326.rsc` (trước đây file chỉ có sfp1–13 → reset+reimport sẽ làm mất nhánh Villa 11-12).
+
+**Comment bridge port trên thiết bị đang SAI**: sfp2 ghi "Downlink to CSS610" nhưng thực tế là IT-ROOM; sfp3 ghi "Downlink to CRS328" nhưng thực tế là CSS610. Lệnh sửa nằm ở mục 6 của `delta-switch-core.rsc`.
+
+Để map nốt 9 CSS610 còn lại (MAC prefix `F4:1E:57:`):
 ```
-/interface bridge port print detail where bridge=bridge-core
 /interface bridge host print where vid=10
 ```
 

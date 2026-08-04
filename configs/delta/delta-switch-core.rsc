@@ -45,12 +45,43 @@
 /ip firewall filter set [find log-prefix="SW-DROP: "] log-prefix="INPUT-DROP: "
 
 # ------------------------------------------------------------
-# 6. Cập nhật comment port theo thực tế (tùy chọn, cho dễ quản lý)
+# 6. Sửa comment bridge port cho ĐÚNG thực tế
+#    (bridge port comment đang SAI: sfp2 ghi "CSS610" nhưng thực ra là
+#     IT-ROOM; sfp3 ghi "CRS328" nhưng thực ra là CSS610)
 # ------------------------------------------------------------
+/interface bridge port set [find interface=sfp-sfpplus2]  comment="Downlink to CRS328 IT-ROOM (192.168.10.3)"
+/interface bridge port set [find interface=sfp-sfpplus5]  comment="Downlink to CRS328 NHA LA (192.168.10.4)"
+/interface bridge port set [find interface=sfp-sfpplus7]  comment="Downlink to CRS328 APART (192.168.10.5)"
+/interface bridge port set [find interface=sfp-sfpplus14] comment="Downlink to CSS610 Villa 11-12 (192.168.10.8)"
+
+# Comment trên interface vật lý (hiện trong Winbox Interfaces list)
 /interface ethernet set [find name=sfp-sfpplus2]  comment="To IT-ROOM (CRS328)"
 /interface ethernet set [find name=sfp-sfpplus5]  comment="To NHA LA (CRS328)"
 /interface ethernet set [find name=sfp-sfpplus7]  comment="To APART (CRS328)"
-/interface ethernet set [find name=sfp-sfpplus14] comment="To 11-12"
+/interface ethernet set [find name=sfp-sfpplus14] comment="To Villa 11-12 (CSS610)"
+
+# ------------------------------------------------------------
+# 6b. KIỂM TRA sfp-sfpplus14 có trong bảng VLAN chưa
+#     (cổng này KHÔNG có trong file config cũ – nếu thiếu trong bảng
+#      VLAN thì Villa 11-12 sẽ mất mạng hoàn toàn)
+# ------------------------------------------------------------
+/interface bridge vlan print where bridge=bridge-core
+# Cột CURRENT-TAGGED của cả 6 VLAN phải có sfp-sfpplus14.
+# Nếu THIẾU, thêm bằng (chạy từng dòng):
+# /interface bridge vlan set [find vlan-ids=10] tagged=([get [find vlan-ids=10] tagged],sfp-sfpplus14)
+# /interface bridge vlan set [find vlan-ids=20] tagged=([get [find vlan-ids=20] tagged],sfp-sfpplus14)
+# /interface bridge vlan set [find vlan-ids=40] tagged=([get [find vlan-ids=40] tagged],sfp-sfpplus14)
+# /interface bridge vlan set [find vlan-ids=50] tagged=([get [find vlan-ids=50] tagged],sfp-sfpplus14)
+# /interface bridge vlan set [find vlan-ids=60] tagged=([get [find vlan-ids=60] tagged],sfp-sfpplus14)
+# /interface bridge vlan set [find vlan-ids=70] tagged=([get [find vlan-ids=70] tagged],sfp-sfpplus14)
+
+# ------------------------------------------------------------
+# 6c. LẤY BẢN ĐỒ 9 CSS610 CÒN LẠI nằm ở cổng nào
+#     MAC prefix của CSS610 là F4:1E:57:
+# ------------------------------------------------------------
+/interface bridge host print where vid=10
+# Đối chiếu MAC với bảng trong configs/css610-swos.txt để biết
+# khu nào (Vila/Bungalow) cắm ở cổng sfp nào, rồi cập nhật comment.
 
 # ------------------------------------------------------------
 # 7. KIỂM TRA
