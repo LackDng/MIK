@@ -3,24 +3,37 @@
 # RouterOS v7 – Layer 2 only
 # ============================================================
 #
-# PORT MAPPING TABLE (14 cổng đang dùng – xác nhận 04/08/2026)
-# +------------------+-----------------------------------------------+
-# | Interface        | Role                                          |
-# +------------------+-----------------------------------------------+
-# | sfp-sfpplus1     | Uplink → Router CCR2004 (S+31DLC10D 10G SMF) |
-# | sfp-sfpplus2     | Downlink → CRS328 IT-ROOM (192.168.10.3)     |
-# | sfp-sfpplus5     | Downlink → CRS328 NHA LA  (192.168.10.4)     |
-# | sfp-sfpplus7     | Downlink → CRS328 APART   (192.168.10.5)     |
-# | sfp-sfpplus14    | Downlink → CSS610 Villa 11-12 (192.168.10.8) |
-# | sfp-sfpplus3,4,6 | Downlink → CSS610 (chưa map cụ thể)          |
-# | sfp-sfpplus8–13  | Downlink → CSS610 (chưa map cụ thể)          |
-# | sfp-sfpplus15–24 | Reserved (not configured)                     |
-# +------------------+-----------------------------------------------+
+# PORT MAPPING TABLE – ĐẦY ĐỦ 14 CỔNG
+# Xác minh 04/08/2026 bằng `/interface bridge host print where vid=10`
+# (đối chiếu MAC thật, không dựa vào comment cũ trên thiết bị)
+#
+# +---------------+--------+----------------+--------------------+
+# | Interface     | IP     | Thiết bị       | MAC                |
+# +---------------+--------+----------------+--------------------+
+# | sfp-sfpplus1  | .10.1  | ROUTER CCR2004 | D0:EA:11:1D:DB:90  |
+# | sfp-sfpplus2  | .10.3  | CRS328 IT-ROOM | 04:F4:1C:D2:1D:E2  |
+# | sfp-sfpplus3  | .10.12 | Bungalow 9-10  | F4:1E:57:C2:CC:9A  |
+# | sfp-sfpplus4  | .10.6  | Vila 5-6       | F4:1E:57:C1:F7:7F  |
+# | sfp-sfpplus5  | .10.4  | CRS328 NHA LA  | 04:F4:1C:D2:80:B5  |
+# | sfp-sfpplus6  | .10.8  | Villa 11-12    | F4:1E:57:C1:EF:40  |
+# | sfp-sfpplus7  | .10.5  | CRS328 APART   | 04:F4:1C:D2:8A:22  |
+# | sfp-sfpplus8  | .10.9  | Vila 9-10      | F4:1E:57:C1:F7:0E  |
+# | sfp-sfpplus9  | .10.11 | Bungalow 7-8   | F4:1E:57:C5:6C:75  |
+# | sfp-sfpplus10 | .10.10 | Vila 3-4       | F4:1E:57:C1:F7:F4  |
+# | sfp-sfpplus11 | .10.15 | Vila 1-2       | F4:1E:57:C5:6A:27  |
+# | sfp-sfpplus12 | .10.7  | Vila 7-8       | F4:1E:57:C1:F8:00  |
+# | sfp-sfpplus13 | .10.14 | Bungalow 13-14 | F4:1E:57:C4:A6:17  |
+# | sfp-sfpplus14 | .10.13 | Bungalow 11-12 | F4:1E:57:C5:6A:3A  |
+# | sfp15–24      | —      | Reserved (chưa cấu hình)                |
+# +---------------+--------+----------------+--------------------+
 #
 # Tổng 14 đường = 1 uplink router + 3 CRS328 + 10 CSS610.
-# Còn 9 cổng CSS610 chưa xác định nằm ở sfp nào – lấy bản đồ bằng:
-#   /interface bridge host print where vid=10
-# rồi đối chiếu MAC prefix F4:1E:57: với bảng trong css610-swos.txt.
+#
+# !! CẢNH BÁO ĐẶT TÊN: comment cũ trên thiết bị ghi sfp-sfpplus14 là
+#    "To 11-12" – dễ hiểu nhầm là VILLA 11-12. Thực tế sfp14 là
+#    BUNGALOW 11-12 (.10.13); VILLA 11-12 (.10.8) nằm ở sfp-sfpplus6.
+#    Hai khu tên gần giống nhau nhưng khác cổng – rút nhầm dây là
+#    mất mạng nhầm khu.
 #
 # STP: CRS326 là Root Bridge (priority=4096)
 #      CCR2004 là Secondary Root (priority=8192)
@@ -48,46 +61,46 @@ add name=bridge-core vlan-filtering=yes priority=4096 \
 /interface bridge port
 add bridge=bridge-core interface=sfp-sfpplus1 \
     frame-types=admit-only-vlan-tagged \
-    comment="Uplink to Router CCR2004"
+    comment="Uplink to Router CCR2004 (192.168.10.1)"
 add bridge=bridge-core interface=sfp-sfpplus2 \
     frame-types=admit-only-vlan-tagged \
     comment="Downlink to CRS328 IT-ROOM (192.168.10.3)"
 add bridge=bridge-core interface=sfp-sfpplus3 \
     frame-types=admit-only-vlan-tagged \
-    comment="Downlink to CSS610 (chua map)"
+    comment="Downlink to CSS610 Bungalow 9-10 (192.168.10.12)"
 add bridge=bridge-core interface=sfp-sfpplus4 \
     frame-types=admit-only-vlan-tagged \
-    comment="Downlink to CSS610 (chua map)"
+    comment="Downlink to CSS610 Vila 5-6 (192.168.10.6)"
 add bridge=bridge-core interface=sfp-sfpplus5 \
     frame-types=admit-only-vlan-tagged \
     comment="Downlink to CRS328 NHA LA (192.168.10.4)"
 add bridge=bridge-core interface=sfp-sfpplus6 \
     frame-types=admit-only-vlan-tagged \
-    comment="Downlink to CSS610 (chua map)"
+    comment="Downlink to CSS610 Villa 11-12 (192.168.10.8)"
 add bridge=bridge-core interface=sfp-sfpplus7 \
     frame-types=admit-only-vlan-tagged \
     comment="Downlink to CRS328 APART (192.168.10.5)"
 add bridge=bridge-core interface=sfp-sfpplus8 \
     frame-types=admit-only-vlan-tagged \
-    comment="Downlink to CSS610 (chua map)"
+    comment="Downlink to CSS610 Vila 9-10 (192.168.10.9)"
 add bridge=bridge-core interface=sfp-sfpplus9 \
     frame-types=admit-only-vlan-tagged \
-    comment="Downlink to CSS610 (chua map)"
+    comment="Downlink to CSS610 Bungalow 7-8 (192.168.10.11)"
 add bridge=bridge-core interface=sfp-sfpplus10 \
     frame-types=admit-only-vlan-tagged \
-    comment="Downlink to CSS610 (chua map)"
+    comment="Downlink to CSS610 Vila 3-4 (192.168.10.10)"
 add bridge=bridge-core interface=sfp-sfpplus11 \
     frame-types=admit-only-vlan-tagged \
-    comment="Downlink to CSS610 (chua map)"
+    comment="Downlink to CSS610 Vila 1-2 (192.168.10.15)"
 add bridge=bridge-core interface=sfp-sfpplus12 \
     frame-types=admit-only-vlan-tagged \
-    comment="Downlink to CSS610 (chua map)"
+    comment="Downlink to CSS610 Vila 7-8 (192.168.10.7)"
 add bridge=bridge-core interface=sfp-sfpplus13 \
     frame-types=admit-only-vlan-tagged \
-    comment="Downlink to CSS610 (chua map)"
+    comment="Downlink to CSS610 Bungalow 13-14 (192.168.10.14)"
 add bridge=bridge-core interface=sfp-sfpplus14 \
     frame-types=admit-only-vlan-tagged \
-    comment="Downlink to CSS610 Villa 11-12 (192.168.10.8)"
+    comment="Downlink to CSS610 Bungalow 11-12 (192.168.10.13)"
 
 # ============================================================
 # STEP 3: BRIDGE VLAN TABLE

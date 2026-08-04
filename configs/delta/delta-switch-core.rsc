@@ -49,39 +49,54 @@
 #    (bridge port comment đang SAI: sfp2 ghi "CSS610" nhưng thực ra là
 #     IT-ROOM; sfp3 ghi "CRS328" nhưng thực ra là CSS610)
 # ------------------------------------------------------------
+/interface bridge port set [find interface=sfp-sfpplus1]  comment="Uplink to Router CCR2004 (192.168.10.1)"
 /interface bridge port set [find interface=sfp-sfpplus2]  comment="Downlink to CRS328 IT-ROOM (192.168.10.3)"
+/interface bridge port set [find interface=sfp-sfpplus3]  comment="Downlink to CSS610 Bungalow 9-10 (192.168.10.12)"
+/interface bridge port set [find interface=sfp-sfpplus4]  comment="Downlink to CSS610 Vila 5-6 (192.168.10.6)"
 /interface bridge port set [find interface=sfp-sfpplus5]  comment="Downlink to CRS328 NHA LA (192.168.10.4)"
+/interface bridge port set [find interface=sfp-sfpplus6]  comment="Downlink to CSS610 Villa 11-12 (192.168.10.8)"
 /interface bridge port set [find interface=sfp-sfpplus7]  comment="Downlink to CRS328 APART (192.168.10.5)"
-/interface bridge port set [find interface=sfp-sfpplus14] comment="Downlink to CSS610 Villa 11-12 (192.168.10.8)"
+/interface bridge port set [find interface=sfp-sfpplus8]  comment="Downlink to CSS610 Vila 9-10 (192.168.10.9)"
+/interface bridge port set [find interface=sfp-sfpplus9]  comment="Downlink to CSS610 Bungalow 7-8 (192.168.10.11)"
+/interface bridge port set [find interface=sfp-sfpplus10] comment="Downlink to CSS610 Vila 3-4 (192.168.10.10)"
+/interface bridge port set [find interface=sfp-sfpplus11] comment="Downlink to CSS610 Vila 1-2 (192.168.10.15)"
+/interface bridge port set [find interface=sfp-sfpplus12] comment="Downlink to CSS610 Vila 7-8 (192.168.10.7)"
+/interface bridge port set [find interface=sfp-sfpplus13] comment="Downlink to CSS610 Bungalow 13-14 (192.168.10.14)"
+/interface bridge port set [find interface=sfp-sfpplus14] comment="Downlink to CSS610 Bungalow 11-12 (192.168.10.13)"
 
 # Comment trên interface vật lý (hiện trong Winbox Interfaces list)
 /interface ethernet set [find name=sfp-sfpplus2]  comment="To IT-ROOM (CRS328)"
+/interface ethernet set [find name=sfp-sfpplus3]  comment="To Bungalow 9-10"
+/interface ethernet set [find name=sfp-sfpplus4]  comment="To Vila 5-6"
 /interface ethernet set [find name=sfp-sfpplus5]  comment="To NHA LA (CRS328)"
+/interface ethernet set [find name=sfp-sfpplus6]  comment="To Villa 11-12"
 /interface ethernet set [find name=sfp-sfpplus7]  comment="To APART (CRS328)"
-/interface ethernet set [find name=sfp-sfpplus14] comment="To Villa 11-12 (CSS610)"
+/interface ethernet set [find name=sfp-sfpplus8]  comment="To Vila 9-10"
+/interface ethernet set [find name=sfp-sfpplus9]  comment="To Bungalow 7-8"
+/interface ethernet set [find name=sfp-sfpplus10] comment="To Vila 3-4"
+/interface ethernet set [find name=sfp-sfpplus11] comment="To Vila 1-2"
+/interface ethernet set [find name=sfp-sfpplus12] comment="To Vila 7-8"
+/interface ethernet set [find name=sfp-sfpplus13] comment="To Bungalow 13-14"
+/interface ethernet set [find name=sfp-sfpplus14] comment="To Bungalow 11-12"
+
+# !! LƯU Ý: comment cũ ghi sfp-sfpplus14 = "To 11-12" gây hiểu nhầm.
+#    sfp14 = BUNGALOW 11-12 (.10.13), KHÔNG phải Villa 11-12.
+#    Villa 11-12 (.10.8) nằm ở sfp-sfpplus6.
 
 # ------------------------------------------------------------
-# 6b. KIỂM TRA sfp-sfpplus14 có trong bảng VLAN chưa
-#     (cổng này KHÔNG có trong file config cũ – nếu thiếu trong bảng
-#      VLAN thì Villa 11-12 sẽ mất mạng hoàn toàn)
+# 7. GỠ VLAN30 TRÊN CORE (vẫn còn – xác nhận 04/08/2026)
+#
+# !! LÀM SAU KHI đã gỡ VLAN30 trên ROUTER và chuyển hết client
+# !! (AP management) sang VLAN60. Gỡ sớm sẽ cắt mạng thiết bị
+# !! đang dùng VLAN30.
 # ------------------------------------------------------------
 /interface bridge vlan print where bridge=bridge-core
-# Cột CURRENT-TAGGED của cả 6 VLAN phải có sfp-sfpplus14.
-# Nếu THIẾU, thêm bằng (chạy từng dòng):
-# /interface bridge vlan set [find vlan-ids=10] tagged=([get [find vlan-ids=10] tagged],sfp-sfpplus14)
-# /interface bridge vlan set [find vlan-ids=20] tagged=([get [find vlan-ids=20] tagged],sfp-sfpplus14)
-# /interface bridge vlan set [find vlan-ids=40] tagged=([get [find vlan-ids=40] tagged],sfp-sfpplus14)
-# /interface bridge vlan set [find vlan-ids=50] tagged=([get [find vlan-ids=50] tagged],sfp-sfpplus14)
-# /interface bridge vlan set [find vlan-ids=60] tagged=([get [find vlan-ids=60] tagged],sfp-sfpplus14)
-# /interface bridge vlan set [find vlan-ids=70] tagged=([get [find vlan-ids=70] tagged],sfp-sfpplus14)
+# Nếu thấy dòng vlan-ids=30 → gỡ bằng:
+# /interface bridge vlan remove [find bridge=bridge-core vlan-ids=30]
 
-# ------------------------------------------------------------
-# 6c. LẤY BẢN ĐỒ 9 CSS610 CÒN LẠI nằm ở cổng nào
-#     MAC prefix của CSS610 là F4:1E:57:
-# ------------------------------------------------------------
-/interface bridge host print where vid=10
-# Đối chiếu MAC với bảng trong configs/css610-swos.txt để biết
-# khu nào (Vila/Bungalow) cắm ở cổng sfp nào, rồi cập nhật comment.
+# Kiểm tra các CRS328 có còn VLAN30 không (chạy trên từng switch):
+#   /interface bridge vlan print
+# Nếu còn → /interface bridge vlan remove [find vlan-ids=30]
 
 # ------------------------------------------------------------
 # 7. KIỂM TRA

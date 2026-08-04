@@ -237,27 +237,41 @@ IT-ROOM đã xác nhận đấu trực tiếp `sfp-sfpplus2` (link-ok 1Gbps, mod
 
 `sfp-sfpplus14` nhãn "To 11-12" ứng với CSS610 **Villa 11-12** (192.168.10.8).
 
-### CORE – bản đồ 14 cổng trunk (xác nhận `/interface bridge port print`)
+### CORE – bản đồ 14 cổng trunk (ĐẦY ĐỦ)
 
-Tất cả 14 cổng đều `admit-only-vlan-tagged` + HW-offload. Con số khớp chính xác: **1 uplink router + 3 CRS328 + 10 CSS610 = 14**.
+Xác minh 04/08/2026 bằng `/interface bridge host print where vid=10` — đối chiếu MAC thật, **không dựa vào comment cũ trên thiết bị** (comment cũ sai nhiều chỗ).
 
-| Cổng | Thiết bị |
-|------|----------|
-| sfp-sfpplus1 | Uplink → ROUTER |
-| sfp-sfpplus2 | CRS328 IT-ROOM (.10.3) |
-| sfp-sfpplus5 | CRS328 NHA LA (.10.4) |
-| sfp-sfpplus7 | CRS328 APART (.10.5) |
-| sfp-sfpplus14 | CSS610 Villa 11-12 (.10.8) |
-| sfp3,4,6,8–13 | 9× CSS610 còn lại – **chưa map cụ thể** |
+| Cổng | IP | Thiết bị | MAC |
+|------|-----|----------|-----|
+| sfp-sfpplus1 | .10.1 | ROUTER CCR2004 | D0:EA:11:1D:DB:90 |
+| sfp-sfpplus2 | .10.3 | CRS328 IT-ROOM | 04:F4:1C:D2:1D:E2 |
+| sfp-sfpplus3 | .10.12 | Bungalow 9-10 | F4:1E:57:C2:CC:9A |
+| sfp-sfpplus4 | .10.6 | Vila 5-6 | F4:1E:57:C1:F7:7F |
+| sfp-sfpplus5 | .10.4 | CRS328 NHA LA | 04:F4:1C:D2:80:B5 |
+| sfp-sfpplus6 | .10.8 | **Villa 11-12** | F4:1E:57:C1:EF:40 |
+| sfp-sfpplus7 | .10.5 | CRS328 APART | 04:F4:1C:D2:8A:22 |
+| sfp-sfpplus8 | .10.9 | Vila 9-10 | F4:1E:57:C1:F7:0E |
+| sfp-sfpplus9 | .10.11 | Bungalow 7-8 | F4:1E:57:C5:6C:75 |
+| sfp-sfpplus10 | .10.10 | Vila 3-4 | F4:1E:57:C1:F7:F4 |
+| sfp-sfpplus11 | .10.15 | Vila 1-2 | F4:1E:57:C5:6A:27 |
+| sfp-sfpplus12 | .10.7 | Vila 7-8 | F4:1E:57:C1:F8:00 |
+| sfp-sfpplus13 | .10.14 | Bungalow 13-14 | F4:1E:57:C4:A6:17 |
+| sfp-sfpplus14 | .10.13 | **Bungalow 11-12** | F4:1E:57:C5:6A:3A |
 
-Đã bổ sung `sfp-sfpplus14` vào `switch-core-crs326.rsc` (trước đây file chỉ có sfp1–13 → reset+reimport sẽ làm mất nhánh Villa 11-12).
+⚠️ **Bẫy đặt tên**: comment cũ ghi sfp-sfpplus14 = "To 11-12" → dễ hiểu nhầm là Villa 11-12. Thực tế **sfp14 = Bungalow 11-12** (.10.13), còn **Villa 11-12** (.10.8) ở **sfp6**. Hai khu tên gần giống, rút nhầm dây là mất mạng nhầm khu.
 
-**Comment bridge port trên thiết bị đang SAI**: sfp2 ghi "Downlink to CSS610" nhưng thực tế là IT-ROOM; sfp3 ghi "Downlink to CRS328" nhưng thực tế là CSS610. Lệnh sửa nằm ở mục 6 của `delta-switch-core.rsc`.
+Bảng VLAN đã xác nhận có đủ `sfp-sfpplus14` → Bungalow 11-12 hoạt động bình thường.
 
-Để map nốt 9 CSS610 còn lại (MAC prefix `F4:1E:57:`):
-```
-/interface bridge host print where vid=10
-```
+### ⚠️ VLAN 30 VẪN CÒN TRÊN CORE
+
+`/interface bridge vlan print` cho thấy CORE vẫn có `vlan-ids=30` trên toàn bộ 14 cổng. Router cũng còn VLAN30. Trình tự gỡ an toàn:
+
+1. Chuyển hết AP management sang VLAN60 (Unifi controller)
+2. Gỡ trên ROUTER (mục 4 `delta-router-ccr2004.rsc`)
+3. Gỡ trên CORE: `/interface bridge vlan remove [find bridge=bridge-core vlan-ids=30]`
+4. Kiểm tra từng CRS328: `/interface bridge vlan print` → gỡ nếu còn
+
+Gỡ sai thứ tự sẽ cắt mạng thiết bị đang dùng VLAN30.
 
 Admin user chung: `Theindochine`. File delta để đồng bộ từng thiết bị: `configs/delta/delta-*.rsc` (paste Terminal, không import).
 
