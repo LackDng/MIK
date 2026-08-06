@@ -49,18 +49,33 @@
 # ------------------------------------------------------------
 # BƯỚC 3: Thêm ether1 vào bảng VLAN
 # ------------------------------------------------------------
-# VLAN60 → UNTAGGED (native)
-/interface bridge vlan set [find vlan-ids=60] untagged=([get [find vlan-ids=60] untagged],ether1)
+#
+# VLAN60 (untagged/native): KHÔNG cần làm gì.
+#   pvid=60 ở BƯỚC 2 tự sinh entry động, xem bằng:
+#     /interface bridge vlan print
+#   sẽ thấy dòng ";;; added by pvid" với untagged=ether1
+#
+# VLAN20 (tagged): PHẢI thêm thủ công – pvid không tạo tagged.
+#
+# !! KHÔNG dùng cú pháp nối kiểu:
+# !!   tagged=([get [find vlan-ids=20] tagged],ether1)
+# !! → báo lỗi "invalid internal item number" vì `get` trả về
+# !!   internal ID (*8) chứ không phải tên cổng.
 
-# VLAN20 → TAGGED
-/interface bridge vlan set [find vlan-ids=20] tagged=([get [find vlan-ids=20] tagged],ether1)
+# 3a. Xem danh sách hiện tại – print detail hiện TÊN cổng:
+/interface bridge vlan print detail where vlan-ids=20
 
-# Nếu cú pháp nối danh sách ở trên báo lỗi, làm thủ công:
-#   1. /interface bridge vlan print   → chép danh sách hiện có
-#   2. Gõ lại đầy đủ, thêm ether1 vào cuối. Ví dụ:
-#      /interface bridge vlan set [find vlan-ids=60] untagged=ether2,ether3,ether1
-#   !! Cẩn thận: set sẽ GHI ĐÈ toàn bộ danh sách, thiếu cổng nào là
-#   !! cổng đó mất mạng.
+# 3b. Gõ lại ĐẦY ĐỦ danh sách cũ + ether1 ở cuối.
+#     Ví dụ nếu bước 3a cho tagged=sfp-sfpplus1 :
+/interface bridge vlan set [find vlan-ids=20] tagged=sfp-sfpplus1,ether1
+
+# !! set GHI ĐÈ toàn bộ danh sách. Chép nguyên danh sách cũ,
+# !! thiếu cổng nào là cổng đó mất VLAN20 ngay lập tức.
+
+# (Tuỳ chọn) Nếu muốn khai báo VLAN60 untagged tường minh thay vì
+# dựa vào entry động – làm y hệt cách trên:
+#   /interface bridge vlan print detail where vlan-ids=60
+#   /interface bridge vlan set [find vlan-ids=60] untagged=<danh sách cũ>,ether1
 
 # ------------------------------------------------------------
 # BƯỚC 4: Cấp nguồn PoE cho AP (CRS328-24P có PoE)

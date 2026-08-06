@@ -284,6 +284,9 @@ Admin user chung: `Theindochine`. File delta để đồng bộ từng thiết b
 | Comment gốc chứa dấu gạch dài `–` không paste được → `find comment="..."` trả rỗng → `no such item` | Dùng `find comment~"chuỗi con"` (toán tử `~`) thay cho `=` |
 | Nối dòng bằng `\` hay bị đứt, dòng sau chạy riêng thành lệnh lỗi | Viết lệnh trên **1 dòng duy nhất** |
 | `[find a="x" and b=y]` | RouterOS dùng khoảng trắng làm AND: `[find a="x" b=y]` |
+| Nối danh sách kiểu `tagged=([get ... tagged],ether1)` → `invalid internal item number` | `get` trả về internal ID (`*8`) không phải tên cổng. Phải `print detail` xem tên, rồi gõ lại đầy đủ danh sách |
+
+**Bridge VLAN – untagged tự động**: đặt `pvid=X` trên bridge port sẽ tự sinh entry động (`;;; added by pvid`) cho untagged. Chỉ **tagged** mới phải thêm tay vào bảng VLAN.
 
 ## Config Files
 
