@@ -308,6 +308,35 @@ Gỡ sai thứ tự sẽ cắt mạng thiết bị đang dùng VLAN30.
 
 Admin user chung: `Theindochine`. File delta để đồng bộ từng thiết bị: `configs/delta/delta-*.rsc` (paste Terminal, không import).
 
+## ⚠️ Audit cấu hình thực tế (export 06/08/2026) – các sai lệch so với thiết kế
+
+Đối chiếu file `/export` thật của ROUTER, CORE, IT-ROOM, NHA LA, APART với file thiết kế trong repo.
+
+### Router – nghiêm trọng nhất: FORWARD chain đang mở hoàn toàn
+Toàn bộ rule DROP trong chain FORWARD (kể cả `R24 Default deny FORWARD`) đang bị `disabled=yes`. RouterOS mặc định ACCEPT khi không rule nào khớp → **camera CCTV đang ra được internet** (R20 tắt), **không còn cách ly VLAN nào được thực thi**. Chi tiết + lệnh khắc phục theo đúng thứ tự phụ thuộc: `configs/delta/delta-router-firewall-audit.rsc`.
+
+### Router – 3 lệch khác so với file thiết kế
+1. `bridge-lan` chưa có `priority=8192 igmp-snooping=yes` (mục 1 của `delta-router-ccr2004.rsc` có vẻ chưa chạy) — CORE vẫn thắng root election (priority=4096 < default 32768) nên KHÔNG ảnh hưởng ai là root hiện tại, nhưng mất vai trò Secondary Root khi CORE down.
+2. Interface list `WAN` chỉ có `pppoe-wan`, thiếu `pppoe-backup`.
+3. R13–R19 (input) và R2a–R2c (forward) đang hardcode `in-interface=pppoe-wan` thay vì `in-interface-list=WAN` → **WireGuard VPN sẽ mất hoàn toàn khi failover sang VNPT** (R13 không match traffic đến qua pppoe-backup). Đây là vấn đề chức năng thật, không chỉ lý thuyết.
+
+Có 1 rule ẩn không tên `accept chain=forward src-address=10.10.10.0/24` nằm trước R1 — vô hiệu hóa toàn bộ R5-R9 (VPN chi tiết) và cấp VPN client full internet + full LAN, không đúng thiết kế split-tunnel. Nên xóa (đã đưa vào delta).
+
+### CORE / NHA LA / APART – hardening chưa áp dụng đồng bộ
+- `discover-interface-list` trên CORE, NHA LA, APART vẫn là `!dynamic` (giá trị mặc định factory) thay vì `MGMT` như thiết kế — chỉ IT-ROOM và Router đã đúng.
+- `/tool mac-server allowed-interface-list` trên CORE/NHA LA/APART là `none` (chặt hơn thiết kế `MGMT`) — có thể là chủ đích, nhưng sẽ mất khả năng cứu hộ MAC-Winbox qua VLAN10 nếu mất IP.
+- **CORE**: mục 6 của `delta-switch-core.rsc` (sửa comment 14 cổng cho đúng thực tế) **chưa chạy** — bridge port vẫn ghi "Downlink to CSS610" trên sfp2 (thực tế là IT-ROOM) và "Reserved trunk" trên các cổng đang chạy thật. Riêng comment tầng ethernet (`/interface ethernet`) đã được cập nhật đúng.
+- **NHA LA**: vẫn còn `vlan-ids=30` trong bridge vlan table — là thiết bị DUY NHẤT còn sót VLAN30 (Router/CORE/IT-ROOM/APART đã sạch).
+
+### IT-ROOM / NHA LA – nghi vấn cổng AP dùng sai kịch bản VLAN60
+Test thực tế trên CSS610 đã xác nhận hệ thống dùng **Kịch bản A** (VLAN60 tagged tới AP, xem mục WiFi/AP bên trên). Nhưng cấu hình hiện tại:
+- **IT-ROOM**: `ether1, ether2, ether3, ether4` đều đang cấu hình theo **Kịch bản B** (`pvid=60`, VLAN60 không có trong danh sách tagged) — tăng từ 1 lên 4 cổng AP so với lần audit trước.
+- **NHA LA**: `ether1, ether2, ether3, ether5` cùng pattern.
+
+Nếu các AP này cũng là Unifi cùng Network "Office" có VLAN ID = 60 (đã xác nhận đúng cho hệ thống này), **các AP đó nhiều khả năng không nhận được VLAN60** — biểu hiện: AP không được adopt bởi controller (vì quản trị AP cũng đi qua VLAN60), không chỉ riêng SSID Office bị lỗi. Cần kiểm tra trên Unifi Controller xem các AP này có đang online không, trước khi áp dụng fix (đổi VLAN60 sang tagged, xem `configs/tools/ap-trunk-port.rsc` Kịch bản A) — không tự ý sửa vì có thể AP đang hoạt động bình thường và giả định này sai.
+
+IT-ROOM `ether5` có comment `"CCTV  OFFICE 60 - ACC"` — nhiều khả năng là port Office bị dán nhầm comment còn sót chữ "CCTV" từ lần copy-paste trước, không phải port camera thật (frame-types/pvid khớp mẫu Office, không phải mẫu CCTV pvid=70).
+
 ### Lưu ý khi paste lệnh vào Winbox Terminal
 
 | Vấn đề | Cách xử lý |
