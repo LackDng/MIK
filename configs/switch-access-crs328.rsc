@@ -53,11 +53,47 @@ add bridge=bridge-access interface=sfp-sfpplus1 \
     frame-types=admit-only-vlan-tagged \
     comment="Uplink to Core CRS326"
 
-# ether1-ether24: not configured, add when needed
-# Example for future access port:
-# add bridge=bridge-access interface=ether1 \
+# ============================================================
+# !! CẢNH BÁO: phần access port bên dưới CHƯA ĐẦY ĐỦ.
+#    File này là TEMPLATE dùng chung cho 3 máy IT-ROOM / NHA LA /
+#    APART, nhưng mỗi máy có bố trí cổng KHÁC NHAU.
+#    Reset + import file này sẽ MẤT toàn bộ cấu hình access port.
+#    → Trước khi dùng để phục hồi, chạy trên máy đó:
+#        /interface bridge vlan print
+#      xem các dòng ";;; added by pvid" để biết cổng nào VLAN nào,
+#      rồi bổ sung vào đây.
+# ============================================================
+
+# ---- Mẫu access port thường dùng ----
+#
+# Office PC (VLAN60):
+# add bridge=bridge-access interface=ether2 \
 #     pvid=60 frame-types=admit-only-untagged-and-priority-tagged \
 #     comment="VLAN60 Office access"
+#
+# IP Phone (VLAN50):
+# add bridge=bridge-access interface=ether9 \
+#     pvid=50 frame-types=admit-only-untagged-and-priority-tagged \
+#     comment="VLAN50 IP Phone"
+#
+# Camera (VLAN70):
+# add bridge=bridge-access interface=ether23 \
+#     pvid=70 frame-types=admit-only-untagged-and-priority-tagged \
+#     comment="VLAN70 CCTV"
+#
+# AP WiFi (VLAN60 native + VLAN20 guest tagged):
+#   frame-types PHẢI là admit-all – xem configs/tools/ap-trunk-port.rsc
+# add bridge=bridge-access interface=ether1 \
+#     pvid=60 frame-types=admit-all ingress-filtering=yes \
+#     comment="AP WiFi - VLAN60 native + VLAN20 guest"
+#   + thêm ether1 vào tagged của VLAN20 ở STEP 3.
+
+# ---- IT-ROOM (192.168.10.3) – cấu hình thực tế 04/08/2026 ----
+# ether1        : AP WiFi   – pvid=60 admit-all + VLAN20 tagged
+# ether2, ether4: Office    – pvid=60
+# ether9        : IP Phone  – pvid=50
+# ether23,24    : CCTV      – pvid=70
+# (NHA LA / APART: chưa map)
 
 # ============================================================
 # STEP 3: BRIDGE VLAN TABLE

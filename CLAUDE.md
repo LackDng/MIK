@@ -264,6 +264,22 @@ Bảng VLAN đã xác nhận có đủ `sfp-sfpplus14` → Bungalow 11-12 hoạt
 
 **MAC `A4:4C:C8:10:AE:8A` trên sfp-sfpplus1** = PC quản trị của admin (192.168.10.50), nằm sau router trên VLAN10. Đã xác nhận — không phải thiết bị lạ, không cần điều tra lại.
 
+### CRS328 – bản đồ cổng access (đang cập nhật dần)
+
+⚠️ File `switch-access-crs328.rsc` **chưa khai báo cổng access nào** (chỉ có uplink `sfp-sfpplus1`). Mỗi CRS328 có bố trí cổng khác nhau. Reset + reimport sẽ mất toàn bộ cấu hình access port → phải bổ sung trước khi dùng file để phục hồi.
+
+**IT-ROOM (192.168.10.3)** – xác nhận 04/08/2026:
+
+| Cổng | VLAN | Vai trò |
+|------|------|---------|
+| sfp-sfpplus1 | trunk all | Uplink → CORE sfp-sfpplus2 |
+| ether1 | 60 native + 20 tagged | **AP WiFi** (Office + Guest) |
+| ether2, ether4 | 60 untagged | Office PC |
+| ether9 | 50 untagged | IP Phone |
+| ether23, ether24 | 70 untagged | Camera/CCTV |
+
+**NHA LA (.10.4) / APART (.10.5)**: chưa map. Lấy bằng `/interface bridge vlan print` trên từng máy (xem các dòng `;;; added by pvid`).
+
 ### ⚠️ VLAN 30 VẪN CÒN TRÊN CORE
 
 `/interface bridge vlan print` cho thấy CORE vẫn có `vlan-ids=30` trên toàn bộ 14 cổng. Router cũng còn VLAN30. Trình tự gỡ an toàn:
