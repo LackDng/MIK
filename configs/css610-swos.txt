@@ -67,23 +67,75 @@
 #   VLAN ID (mgmt)   : 10
 #   Allow From       : 192.168.10.0/24, 192.168.0.0/24  ← VLAN10 + VLAN60
 #   DNS Server       : 8.8.8.8
-#   IGMP Snooping    : ☑ Enable  ← đồng bộ với ROUTER/CORE/CRS328
-#                        (giảm multicast flood IPTV/camera)
+#
+# IGMP Snooping: KHÔNG bật ở đây một cách vô điều kiện.
+#   Đây là tuỳ chọn theo TỪNG VLAN ở tab "VLANs" – xem mục riêng
+#   bên dưới. Bật sai thứ tự sẽ làm IPTV chết sau vài phút.
 #
 # !! KIỂM TRA IP TRƯỚC KHI ĐỔI: nếu gõ nhầm IP trùng máy khác sẽ mất
 # !! quản trị cả 2 máy. Ping thử IP định dùng, phải KHÔNG có phản hồi.
 #
 
 # ============================================================
-# Tab: VLANs
+# Tab: VLANs  – danh sách VLAN + cột IGMP Snooping + Members
 # ============================================================
 #
-#   VLAN ID: 10   Name: Management
-#   VLAN ID: 20   Name: WifiGuest
-#   VLAN ID: 40   Name: IPTVCloud
-#   VLAN ID: 50   Name: IPPhone
-#   VLAN ID: 60   Name: OfficeWifi
-#   VLAN ID: 70   Name: CCTV
+#   VLAN ID: 10   Name: Management   IGMP: ☐
+#   VLAN ID: 20   Name: WifiGuest    IGMP: ☐
+#   VLAN ID: 40   Name: IPTVCloud    IGMP: ☑  ← multicast nặng
+#   VLAN ID: 50   Name: IPPhone      IGMP: ☐  (SIP/RTP là unicast)
+#   VLAN ID: 60   Name: OfficeWifi   IGMP: ☐
+#   VLAN ID: 70   Name: CCTV         IGMP: ☑  ← camera stream
+#
+# ------------------------------------------------------------
+# !! IGMP SNOOPING – ĐIỀU KIỆN BẮT BUỘC: PHẢI CÓ QUERIER
+# ------------------------------------------------------------
+# IGMP snooping hoạt động bằng cách nghe lén bản tin IGMP để biết
+# cổng nào đang có người xem. Nếu KHÔNG có thiết bị gửi IGMP Query
+# định kỳ, bảng thành viên hết hạn sau ~4–5 phút → switch cắt sạch
+# multicast → IPTV ĐANG XEM TỰ NHIÊN ĐỨNG HÌNH.
+#
+# Triệu chứng dễ chẩn đoán nhầm: bật xong chạy ngon, vài phút sau
+# mới chết → hay bị đổ lỗi cho đầu thu IPTV.
+#
+# THỨ TỰ AN TOÀN:
+#   1. Trên CCR2004 – kiểm tra trạng thái hiện tại:
+#        /interface bridge print detail where name=bridge-lan
+#      Nếu chưa có, bật querier (router là gateway L3 của VLAN40/70,
+#      mạng không có multicast router riêng nên router phải làm querier):
+#        /interface bridge set [find name=bridge-lan] igmp-snooping=yes multicast-querier=yes
+#   2. Đợi 2–3 phút, xác nhận:
+#        /interface bridge monitor bridge-lan once
+#   3. LÚC ĐÓ mới tick IGMP cho VLAN 40 và 70 trên CSS610
+#   4. Test: xem IPTV LIÊN TỤC ít nhất 10 phút.
+#      Qua được mốc 5 phút là an toàn.
+#
+# CHƯA MUỐN ĐỤNG ROUTER? → để trống hết cột IGMP.
+#   Mạng vẫn chạy bình thường, chỉ là multicast bị flood ra mọi cổng
+#   (tốn băng thông) – KHÔNG hỏng gì cả. An toàn hơn là bật nửa vời.
+#
+# ------------------------------------------------------------
+# !! CỘT "MEMBERS" – hiện đang tick HẾT mọi cổng cho MỌI VLAN
+# ------------------------------------------------------------
+# Hệ quả: cổng camera cũng nhận tag VLAN 10/20/60, cổng PC cũng nhận
+# tag VLAN 70... Vẫn chạy được (thiết bị bỏ qua tag lạ) nhưng:
+#   - Lãng phí băng thông broadcast/multicast trên mọi cổng
+#   - Rủi ro bảo mật: 1 camera bị chiếm quyền là thấy được mọi VLAN
+#
+# Nên bỏ tick VLAN mà cổng đó không cần. Chỉ giữ:
+#   - Cổng uplink SFP : tick TẤT CẢ VLAN (trunk)
+#   - Cổng camera     : chỉ VLAN 70
+#   - Cổng IP Phone   : chỉ VLAN 50
+#   - Cổng Office/PC  : chỉ VLAN 60
+#   - Cổng AP WiFi    : VLAN 60 + VLAN 20
+# Làm dần từng khu, không cần gấp.
+#
+# ------------------------------------------------------------
+# !! VLAN 30 VẪN CÒN trong bảng – cần gỡ
+# ------------------------------------------------------------
+# VLAN30 tồn tại trên router, CORE và cả 10 CSS610.
+# Thứ tự gỡ: AP (Unifi) → ROUTER → CORE → CRS328 → CSS610.
+# Gỡ ở đây bằng nút "Cut" trên dòng VLAN 30, rồi Apply All.
 #
 
 # ============================================================
