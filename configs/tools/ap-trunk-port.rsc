@@ -98,6 +98,58 @@
 /interface bridge host print where on-interface=ether1
 
 # ============================================================
+# LÀM TRÊN CSS610 (SwOS) – Web UI, KHÔNG có CLI
+# ============================================================
+#
+# ---- Tab "VLAN" (cấu hình từng cổng) ----
+#
+#   Port1:
+#     VLAN Mode       : strict          ← lọc VLAN lạ (giống ingress-filtering=yes)
+#     VLAN Receive    : any             ← !! PHẢI LÀ "any"
+#     Default VLAN ID : 60              ← PVID, gán VLAN60 cho frame untagged
+#     Force VLAN ID   : ☐ (BỎ TRỐNG)    ← tick vào sẽ ép MỌI frame về VLAN60,
+#                                          phá luôn VLAN20 tagged
+#
+#   !! LỖI HAY GẶP: đặt VLAN Receive = "only tagged"
+#      → chặn hết frame untagged → MẤT VLAN60 (SSID Office + quản trị AP).
+#      Cổng AP nhận CẢ HAI loại frame nên bắt buộc dùng "any".
+#
+#      only tagged   → mất VLAN60 (untagged bị drop)
+#      only untagged → mất VLAN20 (tagged bị drop)
+#      any           → ĐÚNG
+#
+# ---- Tab "VLANs" (bảng thành viên VLAN) – BẮT BUỘC, đừng bỏ qua ----
+#
+#   VLAN 60 → Port1 = untagged  +  cổng uplink SFP = tagged
+#   VLAN 20 → Port1 = tagged    +  cổng uplink SFP = tagged
+#
+#   !! KHÁC BIỆT QUAN TRỌNG SO VỚI RouterOS:
+#      RouterOS tự sinh entry untagged từ pvid (";;; added by pvid").
+#      SwOS KHÔNG tự làm. "Default VLAN ID = 60" chỉ xử lý chiều VÀO;
+#      chiều RA vẫn cần khai báo Port1 là untagged của VLAN60 trong
+#      tab VLANs. Thiếu bước này → AP nhận được gói nhưng không gửi
+#      ra được, biểu hiện "kết nối chập chờn / không lấy được IP".
+#
+#   Với VLAN Mode = strict, VLAN nào không khai báo trong bảng sẽ bị
+#   drop hoàn toàn → phải có đủ cả 2 dòng VLAN 20 và 60.
+#
+# ---- Bảng đối chiếu RouterOS ↔ SwOS ----
+#
+#   | Mục đích              | RouterOS (CRS328)        | SwOS (CSS610)          |
+#   |-----------------------|--------------------------|------------------------|
+#   | PVID                  | pvid=60                  | Default VLAN ID = 60   |
+#   | Nhận tagged+untagged  | frame-types=admit-all    | VLAN Receive = any     |
+#   | Lọc VLAN lạ           | ingress-filtering=yes    | VLAN Mode = strict     |
+#   | VLAN20 tagged         | bridge vlan tagged=ether1| VLANs tab: 20→tagged   |
+#   | VLAN60 untagged       | TỰ ĐỘNG từ pvid          | VLANs tab: 60→untagged |
+#
+# ---- PoE cho AP ----
+#   Tab "PoE" → Port1 → bật (auto-on)
+#
+# (Nhãn trên giao diện có thể khác chút giữa SwOS 2.18 và 2.21 –
+#  hệ thống đang chạy lẫn cả hai bản.)
+#
+# ============================================================
 # PHÍA UNIFI CONTROLLER (làm song song)
 # ============================================================
 # Networks:
