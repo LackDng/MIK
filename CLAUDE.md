@@ -185,20 +185,22 @@ Cơ chế "pinned route + blackhole" trong bảng main (tương thích mọi b�
 - Guest WiFi SSID → VLAN 20 (tagged)
 - Office WiFi SSID → VLAN 60
 
-### ⚠️ VLAN60 tới AP là TAGGED, không phải native
+### ⚠️ CHƯA CHỐT ĐƯỢC: VLAN60 tới AP là tagged hay native?
 
-Xác nhận thực tế 04/08/2026: cổng AP trên CSS610 chạy tốt với `VLAN Receive = only tagged`; đổi sang `any` thì **AP mất kết nối ngay**. Nguyên nhân: switch bắt đầu gửi VLAN60 untagged, AP chờ tag 60 nên bỏ gói → chiều về đứt.
+**Đính chính**: kết luận trước đó ("Kịch bản A – VLAN60 tagged") dựa trên 1 lần test đổi `VLAN Receive` từ `only tagged` sang `any` làm AP rớt. Nhưng ảnh chụp Unifi Controller (06/08/2026) cho thấy bằng chứng NGƯỢC LẠI:
 
-Lý do: Unifi **gắn tag cho mọi Network có điền VLAN ID**; chỉ mạng quản trị mặc định mới đi untagged.
+- Trong tab **Networks**, chỉ có 2 network: `Default` (VLAN ID **1**) và `VLAN20 Wifi Guest` (VLAN ID 20). **Không tồn tại network "Office" VLAN 60 nào cả.**
+- SSID `STAFF` (SSID office thực tế) gán vào Network **"Native Network"** = `Default` (VLAN 1) — không phải VLAN60.
 
-| Cấu hình Unifi | Cổng switch phải là |
-|---|---|
-| Network Office **có** VLAN ID 60 ← *hệ thống này* | Trunk thuần: VLAN 60 + 20 đều **tagged** |
-| Network Office **không** có VLAN ID | VLAN 60 untagged (pvid=60) + VLAN 20 tagged |
+Nếu AP thật sự tag traffic quản trị bằng VLAN 1 (theo UI), thì traffic đó sẽ bị switch DROP ngay từ hop đầu tiên (không switch nào trong hệ thống có `vlan-ids=1` trong bảng VLAN tĩnh, `VLAN Mode=strict`/`ingress-filtering=yes` sẽ chặn VLAN lạ). Nhưng thực tế nhiều AP đang online ổn định 15 ngày — mâu thuẫn với giả thuyết "tag VLAN 1".
 
-Chọn sai: AP vẫn "lên" nhưng SSID Office không có mạng hoặc AP không lấy được IP. Chi tiết 2 kịch bản trong `configs/tools/ap-trunk-port.rsc`.
+**Nhiều khả năng hơn**: "Native Network" của Unifi gửi **untagged thật sự** trên dây (VLAN 1 chỉ là nhãn nội bộ của Unifi, không phải tag 802.1Q thật), khớp lại với thiết kế ban đầu (Kịch bản B – VLAN60 native/untagged). Vậy vì sao đổi `any` lại làm rớt AP ở lần test trước? Chưa rõ — có thể do tác dụng phụ khác của SwOS khi đổi `VLAN Receive` (không hẳn do bản chất tagged/untagged), hoặc do đúng lúc đó trùng sự kiện mạng khác.
 
-**Cần kiểm tra lại IT-ROOM `ether1`**: đang cấu hình theo kiểu native (pvid=60 → entry `added by pvid`). Nếu AP ở đó cũng là Unifi cùng kiểu thì phải chuyển VLAN60 sang tagged.
+**KHÔNG áp dụng lại "Kịch bản A" cho các switch khác** cho tới khi xác minh bằng 1 trong 2 cách:
+1. Trên switch AP đang **hoạt động ổn định nhiều ngày**, xem `/interface bridge host print where vid=60` (RouterOS) có thấy MAC của AP đó không → nếu có, AP đang đi qua VLAN60 thật (dù tagged hay untagged, đủ để xác nhận không phải VLAN1).
+2. Cắm laptop vào cổng mirror/span, bắt gói xem AP gửi Ethernet frame có 802.1Q tag hay không.
+
+`configs/tools/ap-trunk-port.rsc` vẫn giữ cả 2 kịch bản A/B để tham khảo, nhưng đánh dấu là **chưa xác nhận final**, không tự áp dụng kịch bản A cho IT-ROOM/NHA LA nữa.
 - Recommended channel widths: 40 MHz for 2.4 GHz, 80 MHz for 5 GHz
 
 ## CCTV (VLAN 70)

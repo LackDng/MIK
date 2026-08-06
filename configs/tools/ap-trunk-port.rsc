@@ -2,6 +2,15 @@
 # CÔNG THỨC: Cổng trunk cho AP WiFi
 # ============================================================
 #
+# !! CẢNH BÁO 06/08/2026: kịch bản A dưới đây được viết dựa trên 1 lần
+# !! test (đổi VLAN Receive only-tagged -> any làm AP rớt). Sau đó ảnh
+# !! chụp Unifi Controller cho thấy bằng chứng NGƯỢC LẠI: SSID Office
+# !! (STAFF) gán vào "Native Network" (Default, VLAN ID hiển thị = 1),
+# !! không có network "Office" VLAN60 nào tồn tại trong Unifi cả.
+# !! CHƯA XÁC ĐỊNH được kịch bản nào đúng — xem CLAUDE.md mục
+# !! "CHƯA CHỐT ĐƯỢC: VLAN60 tới AP là tagged hay native?" để biết
+# !! cách xác minh trước khi áp dụng.
+#
 # !! TRƯỚC TIÊN PHẢI BIẾT AP GỬI VLAN60 TAGGED HAY UNTAGGED !!
 #
 # Vào Unifi Controller → Settings → Networks → "Office":
