@@ -1,5 +1,49 @@
 # ============================================================
 # CÔNG THỨC: Cổng trunk cho AP WiFi
+# ============================================================
+#
+# !! TRƯỚC TIÊN PHẢI BIẾT AP GỬI VLAN60 TAGGED HAY UNTAGGED !!
+#
+# Vào Unifi Controller → Settings → Networks → "Office":
+#
+#   - CÓ điền VLAN ID = 60  → AP gửi/nhận VLAN60 dạng TAGGED
+#                             → dùng KỊCH BẢN A
+#   - KHÔNG điền VLAN ID    → AP dùng untagged làm native
+#                             → dùng KỊCH BẢN B
+#
+# Unifi mặc định GẮN TAG cho mọi Network có VLAN ID; chỉ mạng quản
+# trị mặc định mới đi untagged. Nên KỊCH BẢN A phổ biến hơn.
+#
+# Chọn sai kịch bản → AP vẫn "lên" nhưng SSID Office không có mạng,
+# hoặc AP không lấy được IP quản trị. Đã xác nhận thực tế 04/08/2026:
+# đổi CSS610 Port1 từ "only tagged" sang "any" làm AP mất kết nối
+# → hệ thống này đang dùng KỊCH BẢN A.
+#
+# ------------------------------------------------------------
+# KỊCH BẢN A – VLAN60 TAGGED + VLAN20 TAGGED  (Unifi có VLAN ID)
+# ------------------------------------------------------------
+#   Cổng là trunk thuần, KHÔNG có VLAN untagged nào.
+#
+#   RouterOS (CRS328/CORE):
+#     /interface bridge port set [find interface=ether1] pvid=1 frame-types=admit-only-vlan-tagged ingress-filtering=yes comment="AP WiFi - VLAN60+20 tagged"
+#     → thêm ether1 vào TAGGED của CẢ VLAN 60 và VLAN 20
+#       (xem BƯỚC 3 bên dưới về cách thêm an toàn)
+#
+#   SwOS (CSS610) – tab VLAN:
+#     VLAN Mode       : strict
+#     VLAN Receive    : only tagged     ← KHÔNG đổi thành "any"
+#     Default VLAN ID : 1  (không dùng đến vì không nhận untagged)
+#     Force VLAN ID   : ☐
+#   SwOS – tab VLANs: Port1 là thành viên TAGGED của VLAN 60 và 20
+#
+# ------------------------------------------------------------
+# KỊCH BẢN B – VLAN60 NATIVE + VLAN20 TAGGED  (Unifi không VLAN ID)
+# ------------------------------------------------------------
+#   Đây là nội dung chi tiết bên dưới. CHỈ dùng khi đã xác nhận
+#   AP thực sự gửi VLAN60 untagged.
+#
+# ============================================================
+# KỊCH BẢN B – chi tiết
 #   VLAN 60 = native/untagged  (SSID Office + quản trị AP)
 #   VLAN 20 = tagged           (SSID Wifi Guest)
 # ============================================================
@@ -103,20 +147,23 @@
 #
 # ---- Tab "VLAN" (cấu hình từng cổng) ----
 #
-#   Port1:
+#   Port1  (CHỈ áp dụng cho KỊCH BẢN B – AP gửi VLAN60 untagged):
 #     VLAN Mode       : strict          ← lọc VLAN lạ (giống ingress-filtering=yes)
-#     VLAN Receive    : any             ← !! PHẢI LÀ "any"
+#     VLAN Receive    : any             ← nhận cả tagged lẫn untagged
 #     Default VLAN ID : 60              ← PVID, gán VLAN60 cho frame untagged
 #     Force VLAN ID   : ☐ (BỎ TRỐNG)    ← tick vào sẽ ép MỌI frame về VLAN60,
 #                                          phá luôn VLAN20 tagged
 #
-#   !! LỖI HAY GẶP: đặt VLAN Receive = "only tagged"
-#      → chặn hết frame untagged → MẤT VLAN60 (SSID Office + quản trị AP).
-#      Cổng AP nhận CẢ HAI loại frame nên bắt buộc dùng "any".
+#   Ý nghĩa 3 giá trị VLAN Receive:
+#      only tagged   → chặn untagged  (ĐÚNG cho kịch bản A)
+#      only untagged → chặn tagged    (không dùng cho cổng AP)
+#      any           → nhận cả hai    (ĐÚNG cho kịch bản B)
 #
-#      only tagged   → mất VLAN60 (untagged bị drop)
-#      only untagged → mất VLAN20 (tagged bị drop)
-#      any           → ĐÚNG
+#   !! ĐỪNG ĐỔI "only tagged" → "any" NẾU AP ĐANG CHẠY TỐT.
+#      Đã xảy ra thực tế 04/08/2026: cổng đang chạy với "only tagged",
+#      đổi sang "any" thì AP mất kết nối ngay. Nguyên nhân: switch bắt
+#      đầu gửi VLAN60 UNTAGGED xuống AP, trong khi AP chờ tag 60 nên
+#      bỏ hết gói → chiều về đứt. Đó là dấu hiệu hệ thống dùng KỊCH BẢN A.
 #
 # ---- Tab "VLANs" (bảng thành viên VLAN) – BẮT BUỘC, đừng bỏ qua ----
 #

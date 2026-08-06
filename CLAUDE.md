@@ -182,8 +182,23 @@ Cơ chế "pinned route + blackhole" trong bảng main (tương thích mọi b�
 
 - AP brand: Unifi (U7 LR and similar)
 - AP management VLAN: **VLAN 60** (192.168.0.0/24) — controller and APs on same L2 segment, no inter-VLAN routing needed for management
-- Guest WiFi SSID → VLAN 20 (tagged on trunk ports to APs)
-- Office WiFi SSID → VLAN 60 (untagged/native on access port to AP)
+- Guest WiFi SSID → VLAN 20 (tagged)
+- Office WiFi SSID → VLAN 60
+
+### ⚠️ VLAN60 tới AP là TAGGED, không phải native
+
+Xác nhận thực tế 04/08/2026: cổng AP trên CSS610 chạy tốt với `VLAN Receive = only tagged`; đổi sang `any` thì **AP mất kết nối ngay**. Nguyên nhân: switch bắt đầu gửi VLAN60 untagged, AP chờ tag 60 nên bỏ gói → chiều về đứt.
+
+Lý do: Unifi **gắn tag cho mọi Network có điền VLAN ID**; chỉ mạng quản trị mặc định mới đi untagged.
+
+| Cấu hình Unifi | Cổng switch phải là |
+|---|---|
+| Network Office **có** VLAN ID 60 ← *hệ thống này* | Trunk thuần: VLAN 60 + 20 đều **tagged** |
+| Network Office **không** có VLAN ID | VLAN 60 untagged (pvid=60) + VLAN 20 tagged |
+
+Chọn sai: AP vẫn "lên" nhưng SSID Office không có mạng hoặc AP không lấy được IP. Chi tiết 2 kịch bản trong `configs/tools/ap-trunk-port.rsc`.
+
+**Cần kiểm tra lại IT-ROOM `ether1`**: đang cấu hình theo kiểu native (pvid=60 → entry `added by pvid`). Nếu AP ở đó cũng là Unifi cùng kiểu thì phải chuyển VLAN60 sang tagged.
 - Recommended channel widths: 40 MHz for 2.4 GHz, 80 MHz for 5 GHz
 
 ## CCTV (VLAN 70)
